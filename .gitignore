@@ -1,0 +1,11 @@
+# Сборка .NET
+bin/
+obj/
+*.user
+
+# Кэши и инструменты окружения
+.tools/
+
+# Интерфейс (дополнительно см. frontend/.gitignore)
+node_modules/
+frontend/dist/

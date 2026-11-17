@@ -1,0 +1,6 @@
+@Doska.Api_HostAddress = http://localhost:5000
+
+GET {{Doska.Api_HostAddress}}/api/health
+Accept: application/json
+
+###

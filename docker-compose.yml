@@ -1,0 +1,27 @@
+# Локальная инфраструктура разработки.
+# Один сервис: PostgreSQL для бэкенда. API и интерфейс запускаются на хосте (см. README).
+#
+# Порт 5432 на хосте занят старым стеком проекта doska, поэтому контейнер публикуется
+# на 5433; строка подключения в backend/src/Doska.Api/appsettings.Development.json
+# указывает Port=5433.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: doska
+      POSTGRES_USER: doska
+      POSTGRES_PASSWORD: doska
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U doska -d doska"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+volumes:
+  postgres-data:
