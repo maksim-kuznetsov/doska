@@ -1,0 +1,29 @@
+schema: spec-driven
+
+# Ограничения, которые агент не выведет из кода.
+context: |
+  Проект: доска объявлений. Бэкенд — .NET 10 (ASP.NET Core Web API, Entity Framework Core), база данных — PostgreSQL (Npgsql.EntityFrameworkCore.PostgreSQL, UseSnakeCaseNamingConvention), интерфейс — Vue 3 (Composition API, TypeScript, Vite, Pinia).
+  Технические рамки проекта описаны в openspec/specs/platform/spec.md: новые изменения должны им соответствовать, отклонения описываются явно.
+  Рабочая машина: Windows, PowerShell 5.1 — без bash-синтаксиса (&&, <, 2>/dev/null, cat).
+  Тесты: dotnet test (бэкенд, из корня решения) и pnpm test в web/ (интерфейс, Vitest).
+  Локальная проверка: docker compose (api + web/nginx + postgres), команды запускаются из корня проекта, без wsl.
+  Все артефакты и сообщения коммитов — на русском языке.
+
+# Правила для конкретных артефактов.
+rules:
+  proposal:
+    - Пиши по-русски и кратко, с явным разделом «Вне рамок».
+    - Только суть изменения, без пересказа общеизвестных фактов о платформе .NET и Vue.
+    - Технические решения согласуй с openspec/specs/platform/spec.md; отклонения от неё называй явно.
+  tasks:
+    - Каждая задача включает шаг проверки (тест или конкретная команда).
+
+# Указания для apply и archive.
+operations:
+  apply:
+    guidance:
+      - 'dotnet test запускай перед завершением и сообщай итог; для изменений интерфейса дополнительно pnpm test в web/.'
+      - 'Не заканчивай ход без текстового итога: что сделано, что проверено, следующий шаг.'
+  archive:
+    guidance:
+      - После архивации предложи коммит на русском в стиле «Архивировать change <name>».

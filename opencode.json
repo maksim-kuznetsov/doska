@@ -1,0 +1,21 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "watcher": {
+    "ignore": [
+      "bin/**",
+      "obj/**",
+      "node_modules/**",
+      "dist/**",
+      "TestResults/**"
+    ]
+  },
+  "tool_output": {
+    "max_lines": 400
+  },
+  "commands": {
+    "opsx": {
+      "description": "Полный цикл OpenSpec: propose → apply → archive → commit",
+      "template": "Выполни полный цикл OpenSpec для: $ARGUMENTS\n\n1. Создай change со всеми артефактами (skill openspec-propose).\n2. Сразу примени его (skill openspec-apply-change) и прогони тесты `dotnet test` (для изменений интерфейса дополнительно `pnpm test` в каталоге `web`).\n3. Архивируй change (skill openspec-archive-change).\n4. Сделай git-коммиты на русском: сначала по изменениям кода, затем «Архивировать change <name>».\n\nМежду шагами подтверждений не спрашивай. Остановись и уточни только при существенной неоднозначности, меняющей объём работ или поведение."
+    }
+  }
+}
