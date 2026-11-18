@@ -1,3 +1,4 @@
+using Doska.Api.Infrastructure;
 using Doska.Application.Ads;
 
 namespace Doska.Api.Contracts;
@@ -39,7 +40,8 @@ public sealed record AdCardResponse(
     string CityName,
     string CategoryName,
     string SectionName,
-    DateTimeOffset PublishedAt)
+    DateTimeOffset PublishedAt,
+    string? ThumbnailUrl)
 {
     /// <summary>Создаёт ответ из карточки.</summary>
     public static AdCardResponse From(AdCard card)
@@ -51,7 +53,10 @@ public sealed record AdCardResponse(
             card.CityName,
             card.CategoryName,
             card.SectionName,
-            card.PublishedAt);
+            card.PublishedAt,
+            card.ThumbnailFileName is null
+                ? null
+                : MediaUrls.Photo(card.Id, card.ThumbnailFileName));
 }
 
 /// <summary>Страница результатов.</summary>

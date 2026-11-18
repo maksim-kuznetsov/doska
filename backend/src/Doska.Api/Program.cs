@@ -1,4 +1,5 @@
 using System.Threading.RateLimiting;
+using Doska.Api.Background;
 using Doska.Api.Infrastructure;
 using Doska.Application.Abstractions;
 using Doska.Application.Ads;
@@ -7,10 +8,12 @@ using Doska.Application.Categories;
 using Doska.Application.Moderation;
 using Doska.Domain.Enums;
 using Doska.Infrastructure.Email;
+using Doska.Infrastructure.Media;
 using Doska.Infrastructure.Persistence;
 using Doska.Infrastructure.Security;
 using Doska.Infrastructure.Seed;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,6 +25,13 @@ builder.Services
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ServiceExceptionHandler>();
+
+// Фотографии до 5 МБ держим в памяти, чтобы не создавать временные файлы на диск.
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MemoryBufferThreshold = 10 * 1024 * 1024;
+    options.MultipartBodyLengthLimit = 32 * 1024 * 1024;
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -36,6 +46,9 @@ builder.Services.AddScoped<IAppDbContext>(provider => provider.GetRequiredServic
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.Configure<MediaOptions>(builder.Configuration.GetSection(MediaOptions.SectionName));
+builder.Services.AddScoped<IAdPhotoStorage, LocalAdPhotoStorage>();
+builder.Services.AddHostedService<AdArchiveBackgroundService>();
 if (string.IsNullOrWhiteSpace(builder.Configuration[$"{EmailOptions.SectionName}:Host"]))
 {
     builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();

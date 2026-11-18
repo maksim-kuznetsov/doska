@@ -1,9 +1,35 @@
+using Doska.Api.Infrastructure;
 using Doska.Application.Ads;
 
 namespace Doska.Api.Contracts;
 
-/// <summary>Запрос подачи объявления.</summary>
-public sealed record CreateAdRequest(
+/// <summary>Multipart-запрос подачи объявления с фотографиями.</summary>
+public sealed class CreateAdForm
+{
+    /// <summary>Заголовок.</summary>
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>Описание.</summary>
+    public string Description { get; set; } = string.Empty;
+
+    /// <summary>Цена в рублях.</summary>
+    public decimal Price { get; set; }
+
+    /// <summary>Идентификатор города.</summary>
+    public Guid CityId { get; set; }
+
+    /// <summary>Идентификатор подраздела.</summary>
+    public Guid CategoryId { get; set; }
+
+    /// <summary>Контакты.</summary>
+    public string Contacts { get; set; } = string.Empty;
+
+    /// <summary>Фотографии, от 1 до 5.</summary>
+    public List<IFormFile> Photos { get; set; } = [];
+}
+
+/// <summary>Запрос редактирования объявления.</summary>
+public sealed record UpdateAdRequest(
     string Title,
     string Description,
     decimal Price,
@@ -11,7 +37,18 @@ public sealed record CreateAdRequest(
     Guid CategoryId,
     string Contacts);
 
-/// <summary>Ответ по объявлению.</summary>
+/// <summary>Фотография объявления.</summary>
+public sealed record AdPhotoResponse(
+    Guid Id,
+    string Url,
+    string ThumbnailUrl,
+    string ContentType,
+    long ByteSize,
+    int Width,
+    int Height,
+    int SortOrder);
+
+/// <summary>Ответ по объявлению автора.</summary>
 public sealed record AdResponse(
     Guid Id,
     string Title,
@@ -23,7 +60,8 @@ public sealed record AdResponse(
     string Status,
     string? ModerationReason,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? PublishedAt)
+    DateTimeOffset? PublishedAt,
+    IReadOnlyList<AdPhotoResponse> Photos)
 {
     /// <summary>Создаёт ответ из представления объявления.</summary>
     public static AdResponse From(AdSummary ad)
@@ -38,5 +76,16 @@ public sealed record AdResponse(
             ad.Status,
             ad.ModerationReason,
             ad.CreatedAt,
-            ad.PublishedAt);
+            ad.PublishedAt,
+            ad.Photos
+                .Select(photo => new AdPhotoResponse(
+                    photo.Id,
+                    MediaUrls.Photo(ad.Id, photo.FileName),
+                    MediaUrls.Photo(ad.Id, photo.ThumbnailFileName),
+                    photo.ContentType,
+                    photo.ByteSize,
+                    photo.Width,
+                    photo.Height,
+                    photo.SortOrder))
+                .ToList());
 }

@@ -15,6 +15,20 @@ internal static class ApiClientExtensions
         return await SendAsync(client, HttpMethod.Post, url, body, cancellationToken);
     }
 
+    /// <summary>Отправляет произвольное содержимое с действующим antiforgery-токеном.</summary>
+    public static async Task<HttpResponseMessage> PostContentAsync(
+        this HttpClient client,
+        string url,
+        HttpContent content,
+        CancellationToken cancellationToken)
+    {
+        var csrf = await client.GetFromJsonAsync<CsrfPayload>("/api/auth/csrf", cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
+        request.Headers.Add("X-CSRF-TOKEN", csrf!.Token);
+
+        return await client.SendAsync(request, cancellationToken);
+    }
+
     /// <summary>Отправляет PUT с действующим antiforgery-токеном.</summary>
     public static async Task<HttpResponseMessage> PutJsonAsync(
         this HttpClient client,

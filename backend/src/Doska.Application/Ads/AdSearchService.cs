@@ -39,7 +39,8 @@ public sealed record AdCard(
     string CityName,
     string CategoryName,
     string SectionName,
-    DateTimeOffset PublishedAt);
+    DateTimeOffset PublishedAt,
+    string? ThumbnailFileName);
 
 /// <summary>Публичная лента и поиск по активным объявлениям.</summary>
 public sealed class AdSearchService(IAppDbContext db)
@@ -131,7 +132,11 @@ public sealed class AdSearchService(IAppDbContext db)
                 ad.City!.Name,
                 ad.Category!.Name,
                 ad.Category.Parent != null ? ad.Category.Parent.Name : ad.Category.Name,
-                ad.PublishedAt))
+                ad.PublishedAt,
+                ad.Photos
+                    .OrderBy(photo => photo.SortOrder)
+                    .Select(photo => photo.ThumbnailFileName)
+                    .FirstOrDefault()))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<AdCard>(items, totalCount, page, pageSize);

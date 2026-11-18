@@ -176,6 +176,11 @@ onMounted(async () => {
 
     <ul v-if="items.length > 0" class="list feed">
       <li v-for="ad in items" :key="ad.id" class="card" data-test="ad-card">
+        <div class="ad-card__media">
+          <img v-if="ad.thumbnailUrl" :src="ad.thumbnailUrl" :alt="ad.title" />
+          <div v-else class="ad-card__placeholder" aria-hidden="true">Нет фото</div>
+        </div>
+
         <div class="card__head">
           <h2 class="card__title">{{ ad.title }}</h2>
           <span class="badge">{{ ad.price }} ₽</span>
@@ -231,5 +236,28 @@ onMounted(async () => {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
+}
+
+.ad-card__media {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 0.4rem;
+  border: 1px solid currentColor;
+}
+
+.ad-card__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ad-card__placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 0.85rem;
+  opacity: 0.6;
 }
 </style>

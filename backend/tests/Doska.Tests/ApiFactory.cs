@@ -22,6 +22,14 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         // проверяется отдельно, запуском API без базы.
         builder.UseSetting("Database:MigrateOnStartup", "false");
 
+        // Фоновый автоархив иначе изменит статусы тестовых объявлений с историческими датами.
+        builder.UseSetting("Ads:ArchiveBackgroundService", "false");
+
+        // Медиа пишутся в каталог сборки тестов, чтобы не засорять проект.
+        builder.UseSetting(
+            "Media:RootPath",
+            Path.Combine(AppContext.BaseDirectory, "test-media"));
+
         builder.ConfigureServices(services => services.AddSingleton<IEmailSender>(Emails));
     }
 }

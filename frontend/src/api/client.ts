@@ -11,6 +11,17 @@ export interface CurrentUser {
   isEmailConfirmed: boolean
 }
 
+export interface AdPhotoSummary {
+  id: string
+  url: string
+  thumbnailUrl: string
+  contentType: string
+  byteSize: number
+  width: number
+  height: number
+  sortOrder: number
+}
+
 export interface AdSummary {
   id: string
   title: string
@@ -23,6 +34,7 @@ export interface AdSummary {
   moderationReason: string | null
   createdAt: string
   publishedAt: string | null
+  photos: AdPhotoSummary[]
 }
 
 export interface CreateAdPayload {
@@ -88,6 +100,7 @@ export interface AdCard {
   categoryName: string
   sectionName: string
   publishedAt: string
+  thumbnailUrl: string | null
 }
 
 export interface PagedResult<T> {
@@ -171,6 +184,23 @@ async function fetchCsrfToken(): Promise<string> {
   return payload.token
 }
 
+async function parseResponse<T>(response: Response): Promise<T> {
+  if (response.status === 204) {
+    return undefined as T
+  }
+
+  const text = await response.text()
+  const payload: unknown = text ? JSON.parse(text) : null
+
+  if (!response.ok) {
+    const problem = payload as { title?: string; detail?: string } | null
+    const message = problem?.title ?? problem?.detail ?? `Ошибка запроса (${response.status}).`
+    throw new ApiError(response.status, message)
+  }
+
+  return payload as T
+}
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? 'GET'
   const headers: Record<string, string> = { Accept: 'application/json' }
@@ -193,20 +223,21 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     credentials: 'include',
   })
 
-  if (response.status === 204) {
-    return undefined as T
-  }
+  return parseResponse<T>(response)
+}
 
-  const text = await response.text()
-  const payload: unknown = text ? JSON.parse(text) : null
+async function requestForm<T>(path: string, formData: FormData): Promise<T> {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'X-CSRF-TOKEN': await fetchCsrfToken(),
+    },
+    body: formData,
+    credentials: 'include',
+  })
 
-  if (!response.ok) {
-    const problem = payload as { title?: string; detail?: string } | null
-    const message = problem?.title ?? problem?.detail ?? `Ошибка запроса (${response.status}).`
-    throw new ApiError(response.status, message)
-  }
-
-  return payload as T
+  return parseResponse<T>(response)
 }
 
 export const api = {
@@ -227,7 +258,15 @@ export const api = {
   },
   ads: {
     search: (params: AdSearchParams) => request<PagedResult<AdCard>>(`/ads${toQueryString(params)}`),
-    create: (payload: CreateAdPayload) => request<AdSummary>('/ads', { method: 'POST', body: payload }),
+    create: (formData: FormData) => requestForm<AdSummary>('/ads', formData),
+    get: (id: string) => request<AdSummary>(`/ads/${id}`),
+    update: (id: string, payload: CreateAdPayload) =>
+      request<AdSummary>(`/ads/${id}`, { method: 'PUT', body: payload }),
+    remove: (id: string) => request<void>(`/ads/${id}`, { method: 'DELETE' }),
+    markSold: (id: string) => request<AdSummary>(`/ads/${id}/sold`, { method: 'POST' }),
+    returnToSale: (id: string) =>
+      request<AdSummary>(`/ads/${id}/return-to-sale`, { method: 'POST' }),
+    renew: (id: string) => request<AdSummary>(`/ads/${id}/renew`, { method: 'POST' }),
     mine: () => request<AdSummary[]>('/ads/mine'),
   },
   moderation: {

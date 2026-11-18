@@ -3,6 +3,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 import DefaultLayout from '../layouts/DefaultLayout.vue'
 import { useAuthStore } from '../stores/auth'
+import AdEditView from '../views/AdEditView.vue'
 import AdFormView from '../views/AdFormView.vue'
 import AdminCategoriesView from '../views/AdminCategoriesView.vue'
 import ComplaintsQueueView from '../views/ComplaintsQueueView.vue'
@@ -48,6 +49,12 @@ const routes: RouteRecordRaw[] = [
         path: 'ads/mine',
         name: 'ads-mine',
         component: MyAdsView,
+        meta: { requiresAuth: true },
+      },
+      {
+        path: 'ads/:id/edit',
+        name: 'ad-edit',
+        component: AdEditView,
         meta: { requiresAuth: true },
       },
       {

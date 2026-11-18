@@ -117,4 +117,93 @@ public class Ad : Entity
         Status = AdStatus.Hidden;
         ModerationReason = reason.Trim();
     }
+
+    /// <summary>Срок публикации объявления в днях.</summary>
+    public const int LifetimeDays = 7;
+
+    /// <summary>
+    /// Завершает редактирование: непроверенный автор возвращает объявление на проверку,
+    /// доверенный сохраняет текущий статус.
+    /// </summary>
+    /// <param name="trustedAuthor">Признак доверия автора.</param>
+    public void CompleteEdit(bool trustedAuthor)
+    {
+        if (trustedAuthor || Status == AdStatus.OnModeration)
+        {
+            return;
+        }
+
+        Status = AdStatus.OnModeration;
+        ModerationReason = null;
+        ReminderSentAt = null;
+    }
+
+    /// <summary>Отмечает активное объявление проданным.</summary>
+    /// <exception cref="InvalidOperationException">Объявление не активно.</exception>
+    public void MarkSold()
+    {
+        if (Status != AdStatus.Active)
+        {
+            throw new InvalidOperationException("Продать можно только активное объявление.");
+        }
+
+        Status = AdStatus.Sold;
+    }
+
+    /// <summary>
+    /// Возвращает проданное объявление в продажу: доверенный автор публикует сразу,
+    /// непроверенный — отправляет на проверку.
+    /// </summary>
+    /// <param name="trustedAuthor">Признак доверия автора.</param>
+    /// <param name="now">Момент возврата в продажу.</param>
+    /// <exception cref="InvalidOperationException">Объявление не продано.</exception>
+    public void ReturnToSale(bool trustedAuthor, DateTimeOffset now)
+    {
+        if (Status != AdStatus.Sold)
+        {
+            throw new InvalidOperationException("Вернуть в продажу можно только проданное объявление.");
+        }
+
+        if (trustedAuthor)
+        {
+            Status = AdStatus.Active;
+            PublishedAt = now;
+            ReminderSentAt = null;
+            return;
+        }
+
+        Status = AdStatus.OnModeration;
+        ModerationReason = null;
+        ReminderSentAt = null;
+    }
+
+    /// <summary>Переводит активное объявление в архив.</summary>
+    /// <exception cref="InvalidOperationException">Объявление не активно.</exception>
+    public void Archive()
+    {
+        if (Status != AdStatus.Active)
+        {
+            throw new InvalidOperationException("Архивировать можно только активное объявление.");
+        }
+
+        Status = AdStatus.Archived;
+    }
+
+    /// <summary>
+    /// Продлевает активное или архивное объявление на новый срок и возвращает его в ленту.
+    /// </summary>
+    /// <param name="now">Момент продления.</param>
+    /// <exception cref="InvalidOperationException">Объявление нельзя продлить.</exception>
+    public void Renew(DateTimeOffset now)
+    {
+        if (Status is not (AdStatus.Active or AdStatus.Archived))
+        {
+            throw new InvalidOperationException(
+                "Продлить можно только активное или архивное объявление.");
+        }
+
+        Status = AdStatus.Active;
+        PublishedAt = now;
+        ReminderSentAt = null;
+    }
 }

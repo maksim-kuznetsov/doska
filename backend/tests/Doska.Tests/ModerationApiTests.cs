@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Doska.Application.Abstractions;
 using Doska.Domain.Entities;
@@ -7,6 +9,7 @@ using Doska.Infrastructure.Persistence;
 using Doska.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using SkiaSharp;
 
 namespace Doska.Tests;
 
@@ -410,21 +413,44 @@ public sealed class ModerationApiTests : IClassFixture<ApiFactory>, IAsyncLifeti
     {
         var (cityId, categoryId) = await EnsureCatalogAsync();
 
-        var response = await client.PostJsonAsync(
-            "/api/ads",
-            new
-            {
-                title = $"Тестовое объявление {Guid.NewGuid():N}",
-                description = "Описание объявления",
-                price = 1000m,
-                cityId,
-                categoryId,
-                contacts = "+7 900 111-22-33",
-            },
-            cancellationToken);
+        using var content = new MultipartFormDataContent
+        {
+            { new StringContent($"Тестовое объявление {Guid.NewGuid():N}"), "title" },
+            { new StringContent("Описание объявления"), "description" },
+            { new StringContent(1000m.ToString(CultureInfo.InvariantCulture)), "price" },
+            { new StringContent(cityId.ToString()), "cityId" },
+            { new StringContent(categoryId.ToString()), "categoryId" },
+            { new StringContent("+7 900 111-22-33"), "contacts" },
+        };
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var photo = new ByteArrayContent(TestImage);
+        photo.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        content.Add(photo, "photos", "photo.png");
+
+        var response = await client.PostContentAsync("/api/ads", content, cancellationToken);
+
+        if (response.StatusCode != HttpStatusCode.Created)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            Assert.Fail($"Создание объявления вернуло {(int)response.StatusCode}: {body}");
+        }
+
         return (await response.Content.ReadFromJsonAsync<AdPayload>(cancellationToken))!;
+    }
+
+    private static readonly byte[] TestImage = CreateTestImage();
+
+    private static byte[] CreateTestImage()
+    {
+        using var bitmap = new SKBitmap(8, 8);
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            canvas.Clear(new SKColor(0x00, 0xAA, 0xFF));
+        }
+
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        return data.ToArray();
     }
 
     private sealed record UserPayload(Guid Id, string Email, string Role, bool IsTrusted, bool IsEmailConfirmed);

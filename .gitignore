@@ -7,6 +7,11 @@ obj/
 .tools/
 .tmp/
 
+# Локальное хранилище медиафайлов
+media/
+backend/src/Doska.Api/media/
+backend/tests/Doska.Tests/bin/**/test-media/
+
 # Интерфейс (дополнительно см. frontend/.gitignore)
 node_modules/
 frontend/dist/
