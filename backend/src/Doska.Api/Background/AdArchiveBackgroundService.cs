@@ -4,8 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Doska.Api.Background;
 
 /// <summary>
-/// Периодически архивирует активные объявления старше семи дней. Задача идемпотентна:
-/// повторный запуск обрабатывает только те объявления, которые ещё активны.
+/// Периодически выполняет обслуживание объявлений: архивирует активные объявления
+/// старше семи дней и отправляет напоминания о скором истечении срока. Задачи
+/// идемпотентны: повторный запуск не архивирует уже архивные и не дублирует письма.
 /// </summary>
 public sealed class AdArchiveBackgroundService(
     IServiceScopeFactory scopeFactory,
@@ -44,11 +45,19 @@ public sealed class AdArchiveBackgroundService(
         {
             using var scope = scopeFactory.CreateScope();
             var adService = scope.ServiceProvider.GetRequiredService<AdService>();
+
             var archived = await adService.ArchiveExpiredAsync(cancellationToken);
 
             if (archived > 0)
             {
                 logger.LogInformation("Автоархив: переведено в архив объявлений — {Count}.", archived);
+            }
+
+            var reminded = await adService.SendExpiryRemindersAsync(cancellationToken);
+
+            if (reminded > 0)
+            {
+                logger.LogInformation("Напоминания о сроке: отправлено писем — {Count}.", reminded);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -57,7 +66,7 @@ public sealed class AdArchiveBackgroundService(
         }
         catch (Exception exception)
         {
-            logger.LogError(exception, "Не удалось выполнить автоархив объявлений.");
+            logger.LogError(exception, "Не удалось выполнить обслуживание объявлений.");
         }
     }
 }

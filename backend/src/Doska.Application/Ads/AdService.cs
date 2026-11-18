@@ -42,7 +42,11 @@ public sealed record AdSummary(
     IReadOnlyList<AdPhotoSummary> Photos);
 
 /// <summary>Подача, редактирование и ведение объявлений автором.</summary>
-public sealed class AdService(IAppDbContext db, IAdPhotoStorage photoStorage, TimeProvider clock)
+public sealed class AdService(
+    IAppDbContext db,
+    IAdPhotoStorage photoStorage,
+    IEmailSender emailSender,
+    TimeProvider clock)
 {
     /// <summary>Суточный лимит подачи для автора без доверия.</summary>
     public const int DailyLimitForUntrusted = 5;
@@ -273,6 +277,48 @@ public sealed class AdService(IAppDbContext db, IAdPhotoStorage photoStorage, Ti
         }
 
         return expired.Count;
+    }
+
+    /// <summary>
+    /// Отправляет автору одно письмо за сутки до автоархива активного объявления.
+    /// Повторный запуск не дублирует письмо: объявление с заполненным
+    /// <c>ReminderSentAt</c> больше не попадает в выборку.
+    /// </summary>
+    public async Task<int> SendExpiryRemindersAsync(CancellationToken cancellationToken = default)
+    {
+        var now = clock.GetUtcNow();
+        var windowStart = now.AddDays(-Ad.LifetimeDays);
+        var windowEnd = now.AddDays(-(Ad.LifetimeDays - 1));
+
+        var expiring = await db.Ads
+            .Include(ad => ad.Author)
+            .Where(ad =>
+                ad.Status == AdStatus.Active
+                && ad.ReminderSentAt == null
+                && ad.PublishedAt > windowStart
+                && ad.PublishedAt <= windowEnd)
+            .ToListAsync(cancellationToken);
+
+        foreach (var ad in expiring)
+        {
+            ad.ReminderSentAt = now;
+
+            if (ad.Author is not null)
+            {
+                await emailSender.SendAsync(
+                    ad.Author.Email,
+                    "Объявление скоро будет снято с публикации",
+                    $"Объявление «{ad.Title}» будет снято с публикации через сутки. Продлите его, чтобы оно осталось в ленте.",
+                    cancellationToken);
+            }
+        }
+
+        if (expiring.Count > 0)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        return expiring.Count;
     }
 
     private async Task<User> RequireAuthorAsync(Guid authorId, CancellationToken cancellationToken)
