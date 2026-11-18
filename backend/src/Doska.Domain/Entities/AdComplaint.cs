@@ -31,4 +31,22 @@ public class AdComplaint : Entity
 
     /// <summary>Модератор, закрывший жалобу.</summary>
     public User? ClosedByUser { get; set; }
+
+    /// <summary>
+    /// Закрывает жалобу решением модератора.
+    /// </summary>
+    /// <param name="moderatorId">Идентификатор модератора, принявшего решение.</param>
+    /// <param name="now">Момент закрытия жалобы.</param>
+    /// <exception cref="InvalidOperationException">Жалоба уже закрыта.</exception>
+    public void Close(Guid moderatorId, DateTimeOffset now)
+    {
+        if (Status != ComplaintStatus.Open)
+        {
+            throw new InvalidOperationException("Жалоба уже закрыта.");
+        }
+
+        Status = ComplaintStatus.Closed;
+        ClosedByUserId = moderatorId;
+        ClosedAt = now;
+    }
 }

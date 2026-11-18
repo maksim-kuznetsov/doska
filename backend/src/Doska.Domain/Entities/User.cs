@@ -34,4 +34,48 @@ public class User : Entity
 
     /// <summary>Одноразовые токены пользователя.</summary>
     public ICollection<UserToken> Tokens { get; set; } = new List<UserToken>();
+
+    /// <summary>Число одобренных объявлений, после которого доверие выдаётся автоматически.</summary>
+    public const int TrustThreshold = 3;
+
+    /// <summary>Признак блокировки пользователя.</summary>
+    public bool IsBlocked => BlockedAt is not null;
+
+    /// <summary>
+    /// Учитывает одобрение объявления автора: увеличивает счётчик и при достижении порога
+    /// присваивает доверие. Ранее накопленный счётчик при отклонении не сбрасывается.
+    /// </summary>
+    /// <returns><c>true</c>, если доверие было присвоено этим одобрением.</returns>
+    public bool RegisterApprovedAd()
+    {
+        ApprovedAdsCount++;
+
+        if (IsTrusted || ApprovedAdsCount < TrustThreshold)
+        {
+            return false;
+        }
+
+        IsTrusted = true;
+        return true;
+    }
+
+    /// <summary>Вручную выдаёт доверие автору.</summary>
+    public void GrantTrust() => IsTrusted = true;
+
+    /// <summary>
+    /// Отзывает доверие у автора и обнуляет счётчик одобрений, чтобы доверие нельзя было
+    /// вернуть одним следующим одобрением.
+    /// </summary>
+    public void RevokeTrust()
+    {
+        IsTrusted = false;
+        ApprovedAdsCount = 0;
+    }
+
+    /// <summary>Блокирует пользователя.</summary>
+    /// <param name="now">Момент блокировки.</param>
+    public void Block(DateTimeOffset now) => BlockedAt = now;
+
+    /// <summary>Снимает блокировку.</summary>
+    public void Unblock() => BlockedAt = null;
 }

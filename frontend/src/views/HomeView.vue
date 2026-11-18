@@ -7,11 +7,17 @@ const { appName } = storeToRefs(useAppStore())
 </script>
 
 <template>
-  <section class="home">
+  <section class="page">
     <h1 class="home__title">{{ appName }}</h1>
     <p class="home__text">
-      Каркас приложения готов: интерфейс, API и локальная база данных запускаются отдельно.
+      Доска объявлений. Подайте объявление — после проверки модератором оно появится в ленте.
+      Доверенные авторы публикуются сразу, а решения по объявлениям приходят на email.
     </p>
+
+    <div class="actions">
+      <RouterLink class="button button--primary" to="/ads/new">Подать объявление</RouterLink>
+      <RouterLink class="button" to="/ads/mine">Мои объявления</RouterLink>
+    </div>
   </section>
 </template>
 
@@ -21,6 +27,7 @@ const { appName } = storeToRefs(useAppStore())
 }
 
 .home__text {
-  margin: 0;
+  margin: 0 0 1rem;
+  max-width: 40rem;
 }
 </style>

@@ -1,3 +1,4 @@
+using Doska.Application.Abstractions;
 using Doska.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,7 +20,7 @@ namespace Doska.Infrastructure.Persistence;
 /// и подменяется в тестах.
 /// </para>
 /// </summary>
-public sealed class AppDbContext : DbContext
+public sealed class AppDbContext : DbContext, IAppDbContext
 {
     private readonly TimeProvider _timeProvider;
 

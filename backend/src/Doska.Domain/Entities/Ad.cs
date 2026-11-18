@@ -55,4 +55,66 @@ public class Ad : Entity
 
     /// <summary>Жалобы на объявление.</summary>
     public ICollection<AdComplaint> Complaints { get; set; } = new List<AdComplaint>();
+
+    /// <summary>
+    /// Одобряет объявление, находящееся на проверке: переводит его в статус «активно»
+    /// и фиксирует дату публикации.
+    /// </summary>
+    /// <param name="now">Момент принятия решения.</param>
+    /// <exception cref="InvalidOperationException">Объявление не находится на проверке.</exception>
+    public void Approve(DateTimeOffset now)
+    {
+        if (Status != AdStatus.OnModeration)
+        {
+            throw new InvalidOperationException("Одобрить можно только объявление на проверке.");
+        }
+
+        Status = AdStatus.Active;
+        PublishedAt = now;
+        ModerationReason = null;
+    }
+
+    /// <summary>
+    /// Отклоняет объявление, находящееся на проверке, с обязательной причиной.
+    /// </summary>
+    /// <param name="reason">Причина отклонения.</param>
+    /// <exception cref="InvalidOperationException">Объявление не находится на проверке.</exception>
+    /// <exception cref="ArgumentException">Причина не указана.</exception>
+    public void Reject(string reason)
+    {
+        if (Status != AdStatus.OnModeration)
+        {
+            throw new InvalidOperationException("Отклонить можно только объявление на проверке.");
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            throw new ArgumentException("Причина отклонения обязательна.", nameof(reason));
+        }
+
+        Status = AdStatus.Rejected;
+        ModerationReason = reason.Trim();
+    }
+
+    /// <summary>
+    /// Скрывает активное объявление с обязательной причиной.
+    /// </summary>
+    /// <param name="reason">Причина скрытия.</param>
+    /// <exception cref="InvalidOperationException">Объявление не активно.</exception>
+    /// <exception cref="ArgumentException">Причина не указана.</exception>
+    public void Hide(string reason)
+    {
+        if (Status != AdStatus.Active)
+        {
+            throw new InvalidOperationException("Скрыть можно только активное объявление.");
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            throw new ArgumentException("Причина скрытия обязательна.", nameof(reason));
+        }
+
+        Status = AdStatus.Hidden;
+        ModerationReason = reason.Trim();
+    }
 }

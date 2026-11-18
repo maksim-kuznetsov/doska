@@ -1,5 +1,7 @@
+using Doska.Application.Abstractions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Doska.Tests;
 
@@ -9,6 +11,9 @@ namespace Doska.Tests;
 /// </summary>
 public sealed class ApiFactory : WebApplicationFactory<Program>
 {
+    /// <summary>Сборщик отправленных писем: подменяет настоящую отправку.</summary>
+    public CapturingEmailSender Emails { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
@@ -16,5 +21,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         // Интеграционные тесты не требуют запущенной базы: применение миграций при старте
         // проверяется отдельно, запуском API без базы.
         builder.UseSetting("Database:MigrateOnStartup", "false");
+
+        builder.ConfigureServices(services => services.AddSingleton<IEmailSender>(Emails));
     }
 }

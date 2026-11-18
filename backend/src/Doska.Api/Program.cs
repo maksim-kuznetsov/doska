@@ -1,10 +1,26 @@
+using System.Threading.RateLimiting;
+using Doska.Api.Infrastructure;
+using Doska.Application.Abstractions;
+using Doska.Application.Ads;
+using Doska.Application.Auth;
+using Doska.Application.Moderation;
+using Doska.Domain.Enums;
+using Doska.Infrastructure.Email;
 using Doska.Infrastructure.Persistence;
+using Doska.Infrastructure.Security;
+using Doska.Infrastructure.Seed;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services
+    .AddControllersWithViews(options => options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute()))
+    .AddJsonOptions(options => options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase);
+
 builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<ServiceExceptionHandler>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -14,6 +30,78 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options
         .UseNpgsql(builder.Configuration.GetConnectionString("Default"))
         .UseSnakeCaseNamingConvention());
+
+builder.Services.AddScoped<IAppDbContext>(provider => provider.GetRequiredService<AppDbContext>());
+builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
+
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
+if (string.IsNullOrWhiteSpace(builder.Configuration[$"{EmailOptions.SectionName}:Host"]))
+{
+    builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
+}
+else
+{
+    builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+}
+
+builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<AdService>();
+builder.Services.AddScoped<CatalogService>();
+builder.Services.AddScoped<ModerationService>();
+builder.Services.AddScoped<ComplaintService>();
+builder.Services.AddScoped<TrustService>();
+
+builder.Services
+    .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.Cookie.Name = "doska.session";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.ExpireTimeSpan = TimeSpan.FromDays(7);
+        options.SlidingExpiration = true;
+        options.Events = new CookieAuthenticationEvents
+        {
+            OnRedirectToLogin = context =>
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return Task.CompletedTask;
+            },
+            OnRedirectToAccessDenied = context =>
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return Task.CompletedTask;
+            },
+        };
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(
+        AuthorizationPolicies.ModeratorOrAdmin,
+        policy => policy.RequireRole(nameof(UserRole.Moderator), nameof(UserRole.Admin)));
+
+    options.AddPolicy(
+        AuthorizationPolicies.Admin,
+        policy => policy.RequireRole(nameof(UserRole.Admin)));
+});
+
+builder.Services.AddAntiforgery(options => options.HeaderName = "X-CSRF-TOKEN");
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(RateLimitPolicies.Sensitive, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
+});
 
 const string frontendDevPolicy = "FrontendDev";
 builder.Services.AddCors(options =>
@@ -35,15 +123,24 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseExceptionHandler();
+app.UseStatusCodePages();
+app.UseRateLimiter();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 await ApplyMigrationsAsync(app);
+
+if (args.Contains("seed", StringComparer.OrdinalIgnoreCase))
+{
+    await SeedDemoDataAsync(app);
+    return;
+}
 
 app.MapControllers();
 
 app.Run();
 
-// Миграции применяются до обработки запросов: если база недоступна, приложение
-// падает при старте, а не отвечает ошибками на каждый запрос.
 static async Task ApplyMigrationsAsync(WebApplication app)
 {
     if (!app.Configuration.GetValue("Database:MigrateOnStartup", true))
@@ -72,5 +169,25 @@ static async Task ApplyMigrationsAsync(WebApplication app)
     logger.LogInformation("Миграции базы данных применены.");
 }
 
-/// <summary>Точка входа, открытая для интеграционных тестов.</summary>
+static async Task SeedDemoDataAsync(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    var logger = scope.ServiceProvider
+        .GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Doska.Seed");
+
+    if (app.Environment.IsProduction())
+    {
+        logger.LogWarning("Демонстрационные данные не создаются в окружении Production.");
+        return;
+    }
+
+    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+
+    await DemoDataSeeder.SeedAsync(context, passwordHasher);
+    logger.LogInformation("Демонстрационные данные созданы.");
+}
+
+/// <summary>Точка входа приложения: требуется для интеграционных тестов.</summary>
 public partial class Program;
