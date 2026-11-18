@@ -7,14 +7,17 @@ import AdEditView from '../views/AdEditView.vue'
 import AdFormView from '../views/AdFormView.vue'
 import AdminCategoriesView from '../views/AdminCategoriesView.vue'
 import AdminCitiesView from '../views/AdminCitiesView.vue'
+import AdminUsersView from '../views/AdminUsersView.vue'
 import ComplaintsQueueView from '../views/ComplaintsQueueView.vue'
 import ConfirmEmailView from '../views/ConfirmEmailView.vue'
 import DesignSystemGuide from '../views/DesignSystemGuide.vue'
+import ForgotPasswordView from '../views/ForgotPasswordView.vue'
 import HomeView from '../views/HomeView.vue'
 import LoginView from '../views/LoginView.vue'
 import ModerationQueueView from '../views/ModerationQueueView.vue'
 import MyAdsView from '../views/MyAdsView.vue'
 import RegisterView from '../views/RegisterView.vue'
+import ResetPasswordView from '../views/ResetPasswordView.vue'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -40,6 +43,16 @@ const routes: RouteRecordRaw[] = [
         path: 'confirm-email',
         name: 'confirm-email',
         component: ConfirmEmailView,
+      },
+      {
+        path: 'forgot-password',
+        name: 'forgot-password',
+        component: ForgotPasswordView,
+      },
+      {
+        path: 'reset-password',
+        name: 'reset-password',
+        component: ResetPasswordView,
       },
       {
         path: 'ads/new',
@@ -81,6 +94,12 @@ const routes: RouteRecordRaw[] = [
         path: 'admin/cities',
         name: 'admin-cities',
         component: AdminCitiesView,
+        meta: { requiresAdmin: true },
+      },
+      {
+        path: 'admin/users',
+        name: 'admin-users',
+        component: AdminUsersView,
         meta: { requiresAdmin: true },
       },
     ],

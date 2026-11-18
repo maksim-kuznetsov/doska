@@ -81,6 +81,30 @@ public sealed class AuthController(AuthService authService) : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Запрашивает сброс пароля; ответ не раскрывает существование аккаунта.</summary>
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Sensitive)]
+    public async Task<IActionResult> ForgotPassword(
+        [FromBody] ForgotPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        await authService.RequestPasswordResetAsync(request.Email, cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>Устанавливает новый пароль по одноразовой ссылке.</summary>
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Sensitive)]
+    public async Task<IActionResult> ResetPassword(
+        [FromBody] ResetPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        await authService.ResetPasswordAsync(request.Token, request.Password, cancellationToken);
+        return NoContent();
+    }
+
     private async Task SignInAsync(AuthenticatedUser user)
     {
         var claims = new List<Claim>

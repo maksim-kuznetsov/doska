@@ -64,6 +64,10 @@ async function submit(): Promise<void> {
     </form>
 
     <p class="text-muted">
+      <RouterLink class="link" to="/forgot-password">Забыли пароль?</RouterLink>
+    </p>
+
+    <p class="text-muted">
       Нет аккаунта?
       <RouterLink class="link" to="/register">Зарегистрироваться</RouterLink>
     </p>

@@ -2,6 +2,7 @@ using System.Threading.RateLimiting;
 using Doska.Api.Background;
 using Doska.Api.Infrastructure;
 using Doska.Application.Abstractions;
+using Doska.Application.Accounts;
 using Doska.Application.Ads;
 using Doska.Application.Auth;
 using Doska.Application.Categories;
@@ -60,6 +61,7 @@ else
 }
 
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AdService>();
 builder.Services.AddScoped<AdSearchService>();
 builder.Services.AddScoped<CatalogService>();

@@ -144,6 +144,15 @@ export interface CityAdminView {
   isActive: boolean
 }
 
+export interface AdminUserView {
+  id: string
+  email: string
+  role: 'User' | 'Moderator' | 'Admin'
+  isTrusted: boolean
+  isBlocked: boolean
+  isEmailConfirmed: boolean
+}
+
 /** Ошибка API с HTTP-кодом и сообщением из `ProblemDetails`. */
 export class ApiError extends Error {
   readonly status: number
@@ -255,6 +264,10 @@ export const api = {
       request<CurrentUser>('/auth/register', { method: 'POST', body: { email, password } }),
     confirmEmail: (token: string) =>
       request<void>('/auth/confirm-email', { method: 'POST', body: { token } }),
+    forgotPassword: (email: string) =>
+      request<void>('/auth/forgot-password', { method: 'POST', body: { email } }),
+    resetPassword: (token: string, password: string) =>
+      request<void>('/auth/reset-password', { method: 'POST', body: { token, password } }),
     logout: () => request<void>('/auth/logout', { method: 'POST' }),
   },
   catalog: {
@@ -293,6 +306,13 @@ export const api = {
   users: {
     grantTrust: (id: string) => request<CurrentUser>(`/users/${id}/trust`, { method: 'POST' }),
     revokeTrust: (id: string) => request<CurrentUser>(`/users/${id}/trust`, { method: 'DELETE' }),
+    block: (id: string) => request<CurrentUser>(`/users/${id}/block`, { method: 'POST' }),
+    unblock: (id: string) => request<CurrentUser>(`/users/${id}/unblock`, { method: 'POST' }),
+  },
+  adminUsers: {
+    list: () => request<AdminUserView[]>('/admin/users'),
+    setRole: (id: string, role: string) =>
+      request<AdminUserView>(`/admin/users/${id}/role`, { method: 'PUT', body: { role } }),
   },
   adminCategories: {
     tree: () => request<CategorySectionView[]>('/admin/categories'),

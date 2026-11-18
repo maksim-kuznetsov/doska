@@ -28,6 +28,8 @@ public sealed class AuthService(IAppDbContext db, IPasswordHasher passwordHasher
 
     private static readonly TimeSpan ConfirmationTokenLifetime = TimeSpan.FromDays(1);
 
+    private static readonly TimeSpan ResetTokenLifetime = TimeSpan.FromHours(1);
+
     /// <summary>Регистрирует неподтверждённый аккаунт и отправляет код подтверждения.</summary>
     public async Task<AuthenticatedUser> RegisterAsync(
         string email,
@@ -64,7 +66,7 @@ public sealed class AuthService(IAppDbContext db, IPasswordHasher passwordHasher
         db.Users.Add(user);
         await db.SaveChangesAsync(cancellationToken);
 
-        var rawToken = CreateToken(user.Id, TokenPurpose.EmailConfirmation);
+        var rawToken = CreateToken(user.Id, TokenPurpose.EmailConfirmation, ConfirmationTokenLifetime);
         await db.SaveChangesAsync(cancellationToken);
         await emailSender.SendAsync(
             user.Email,
@@ -128,6 +130,92 @@ public sealed class AuthService(IAppDbContext db, IPasswordHasher passwordHasher
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Запрашивает сброс пароля. Отправляет письмо только для существующего адреса,
+    /// но всегда завершается успешно, не раскрывая, зарегистрирован ли адрес.
+    /// </summary>
+    public async Task RequestPasswordResetAsync(
+        string email,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedEmail = (email ?? string.Empty).Trim();
+
+        if (normalizedEmail.Length == 0)
+        {
+            return;
+        }
+
+        var user = await db.Users.FirstOrDefaultAsync(
+            candidate => candidate.Email.ToLower() == normalizedEmail.ToLower(),
+            cancellationToken);
+
+        if (user is null || user.IsBlocked)
+        {
+            return;
+        }
+
+        var now = clock.GetUtcNow();
+
+        var pending = await db.UserTokens
+            .Where(token =>
+                token.UserId == user.Id
+                && token.Purpose == TokenPurpose.PasswordReset
+                && token.UsedAt == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var token in pending)
+        {
+            token.UsedAt = now;
+        }
+
+        var rawToken = CreateToken(user.Id, TokenPurpose.PasswordReset, ResetTokenLifetime);
+        await db.SaveChangesAsync(cancellationToken);
+
+        await emailSender.SendAsync(
+            user.Email,
+            "Сброс пароля",
+            $"Чтобы задать новый пароль, откройте ссылку /reset-password?token={rawToken}",
+            cancellationToken);
+    }
+
+    /// <summary>Меняет пароль по одноразовой ссылке и делает её недействительной.</summary>
+    public async Task ResetPasswordAsync(
+        string rawToken,
+        string password,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(rawToken))
+        {
+            throw new ServiceException(
+                ServiceErrorKind.Validation,
+                "Ссылка сброса недействительна или устарела. Запросите новую.");
+        }
+
+        ValidatePassword(password);
+
+        var hash = TokenHasher.Hash(rawToken);
+        var token = await db.UserTokens
+            .Include(candidate => candidate.User)
+            .FirstOrDefaultAsync(
+                candidate => candidate.TokenHash == hash && candidate.Purpose == TokenPurpose.PasswordReset,
+                cancellationToken);
+
+        if (token is null || token.UsedAt is not null || token.ExpiresAt <= clock.GetUtcNow())
+        {
+            throw new ServiceException(
+                ServiceErrorKind.Validation,
+                "Ссылка сброса недействительна или устарела. Запросите новую.");
+        }
+
+        if (token.User is not null)
+        {
+            token.User.PasswordHash = passwordHasher.Hash(password);
+        }
+
+        token.UsedAt = clock.GetUtcNow();
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     /// <summary>Возвращает сведения о пользователе по идентификатору.</summary>
     public async Task<AuthenticatedUser> GetAsync(Guid userId, CancellationToken cancellationToken = default)
     {
@@ -137,7 +225,7 @@ public sealed class AuthService(IAppDbContext db, IPasswordHasher passwordHasher
         return AuthenticatedUser.From(user);
     }
 
-    private string CreateToken(Guid userId, TokenPurpose purpose)
+    private string CreateToken(Guid userId, TokenPurpose purpose, TimeSpan lifetime)
     {
         var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         db.UserTokens.Add(new UserToken
@@ -145,7 +233,7 @@ public sealed class AuthService(IAppDbContext db, IPasswordHasher passwordHasher
             UserId = userId,
             TokenHash = TokenHasher.Hash(rawToken),
             Purpose = purpose,
-            ExpiresAt = clock.GetUtcNow().Add(ConfirmationTokenLifetime),
+            ExpiresAt = clock.GetUtcNow().Add(lifetime),
         });
 
         return rawToken;

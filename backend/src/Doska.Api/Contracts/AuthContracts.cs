@@ -11,6 +11,12 @@ public sealed record LoginRequest(string Email, string Password);
 /// <summary>Запрос подтверждения email.</summary>
 public sealed record ConfirmEmailRequest(string Token);
 
+/// <summary>Запрос сброса пароля.</summary>
+public sealed record ForgotPasswordRequest(string Email);
+
+/// <summary>Запрос установки нового пароля по одноразовой ссылке.</summary>
+public sealed record ResetPasswordRequest(string Token, string Password);
+
 /// <summary>Ответ с antiforgery-токеном.</summary>
 public sealed record CsrfResponse(string Token);
 
