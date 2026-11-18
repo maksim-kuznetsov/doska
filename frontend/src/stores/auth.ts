@@ -12,6 +12,7 @@ export const useAuthStore = defineStore('auth', () => {
   const canModerate = computed(
     () => user.value?.role === 'Moderator' || user.value?.role === 'Admin',
   )
+  const isAdmin = computed(() => user.value?.role === 'Admin')
 
   async function load(): Promise<void> {
     try {
@@ -38,5 +39,15 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
   }
 
-  return { user, loaded, isAuthenticated, canModerate, load, login, register, logout }
+  return {
+    user,
+    loaded,
+    isAuthenticated,
+    canModerate,
+    isAdmin,
+    load,
+    login,
+    register,
+    logout,
+  }
 })

@@ -83,11 +83,11 @@ public sealed class AdSearchService(IAppDbContext db)
 
         if (query.CategoryId is Guid categoryId)
         {
-            // Раздел верхнего уровня охватывает только активные подразделы;
-            // существующие объявления деактивированного подраздела остаются в общей ленте.
+            // Раздел верхнего уровня охватывает только активные подразделы. Прямой выбор
+            // подраздела оставляет доступными его объявления даже после деактивации.
             ads = ads.Where(ad =>
-                ad.Category!.IsActive
-                && (ad.CategoryId == categoryId || ad.Category.ParentId == categoryId));
+                ad.CategoryId == categoryId
+                || (ad.Category!.ParentId == categoryId && ad.Category.IsActive));
         }
 
         if (query.CityId is Guid cityId)

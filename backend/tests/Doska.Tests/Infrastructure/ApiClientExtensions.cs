@@ -15,6 +15,16 @@ internal static class ApiClientExtensions
         return await SendAsync(client, HttpMethod.Post, url, body, cancellationToken);
     }
 
+    /// <summary>Отправляет PUT с действующим antiforgery-токеном.</summary>
+    public static async Task<HttpResponseMessage> PutJsonAsync(
+        this HttpClient client,
+        string url,
+        object? body,
+        CancellationToken cancellationToken)
+    {
+        return await SendAsync(client, HttpMethod.Put, url, body, cancellationToken);
+    }
+
     /// <summary>Отправляет DELETE с действующим antiforgery-токеном.</summary>
     public static async Task<HttpResponseMessage> DeleteWithCsrfAsync(
         this HttpClient client,

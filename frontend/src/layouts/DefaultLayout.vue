@@ -1,15 +1,24 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 
+import { api, type SectionOption } from '../api/client'
+import CategoryMenu from '../components/CategoryMenu.vue'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+const sections = ref<SectionOption[]>([])
 
-onMounted(() => {
+onMounted(async () => {
   if (!auth.loaded) {
     void auth.load()
+  }
+
+  try {
+    sections.value = await api.catalog.sections()
+  } catch {
+    sections.value = []
   }
 })
 
@@ -24,11 +33,14 @@ async function logout(): Promise<void> {
     <header class="layout__header">
       <RouterLink class="layout__brand" to="/">Doska</RouterLink>
 
+      <CategoryMenu :sections="sections" />
+
       <nav class="layout__nav" aria-label="Основная навигация">
         <RouterLink to="/ads/new">Подать объявление</RouterLink>
         <RouterLink to="/ads/mine">Мои объявления</RouterLink>
         <RouterLink v-if="auth.canModerate" to="/moderation">Проверка</RouterLink>
         <RouterLink v-if="auth.canModerate" to="/complaints">Жалобы</RouterLink>
+        <RouterLink v-if="auth.isAdmin" to="/admin/categories">Категории</RouterLink>
       </nav>
 
       <div class="layout__account">

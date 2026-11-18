@@ -110,6 +110,21 @@ export interface AdSearchParams {
   pageSize?: number
 }
 
+export interface CategoryItemView {
+  id: string
+  name: string
+  sortOrder: number
+  isActive: boolean
+}
+
+export interface CategorySectionView {
+  id: string
+  name: string
+  sortOrder: number
+  isActive: boolean
+  subsections: CategoryItemView[]
+}
+
 /** Ошибка API с HTTP-кодом и сообщением из `ProblemDetails`. */
 export class ApiError extends Error {
   readonly status: number
@@ -122,7 +137,7 @@ export class ApiError extends Error {
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'DELETE'
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
   body?: unknown
 }
 
@@ -233,5 +248,29 @@ export const api = {
   users: {
     grantTrust: (id: string) => request<CurrentUser>(`/users/${id}/trust`, { method: 'POST' }),
     revokeTrust: (id: string) => request<CurrentUser>(`/users/${id}/trust`, { method: 'DELETE' }),
+  },
+  adminCategories: {
+    tree: () => request<CategorySectionView[]>('/admin/categories'),
+    createSection: (name: string, sortOrder: number) =>
+      request<CategorySectionView>('/admin/categories/sections', {
+        method: 'POST',
+        body: { name, sortOrder },
+      }),
+    createSubsection: (sectionId: string, name: string, sortOrder: number) =>
+      request<CategoryItemView>(`/admin/categories/${sectionId}/subsections`, {
+        method: 'POST',
+        body: { name, sortOrder },
+      }),
+    update: (id: string, name: string, sortOrder: number) =>
+      request<CategoryItemView>(`/admin/categories/${id}`, {
+        method: 'PUT',
+        body: { name, sortOrder },
+      }),
+    setActive: (id: string, isActive: boolean) =>
+      request<CategoryItemView>(
+        `/admin/categories/${id}/${isActive ? 'activate' : 'deactivate'}`,
+        { method: 'POST' },
+      ),
+    remove: (id: string) => request<void>(`/admin/categories/${id}`, { method: 'DELETE' }),
   },
 }

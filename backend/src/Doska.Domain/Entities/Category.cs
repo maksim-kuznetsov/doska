@@ -30,6 +30,77 @@ public class Category : Entity
     /// <summary>Признак раздела верхнего уровня.</summary>
     public bool IsSection => ParentId is null;
 
+    /// <summary>Максимальная длина названия категории.</summary>
+    public const int MaxNameLength = 200;
+
+    /// <summary>Переименовывает категорию.</summary>
+    /// <param name="name">Новое название.</param>
+    /// <exception cref="ArgumentException">Название пустое или слишком длинное.</exception>
+    public void Rename(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Название категории обязательно.", nameof(name));
+        }
+
+        var trimmed = name.Trim();
+
+        if (trimmed.Length > MaxNameLength)
+        {
+            throw new ArgumentException(
+                $"Название категории не длиннее {MaxNameLength} символов.",
+                nameof(name));
+        }
+
+        Name = trimmed;
+    }
+
+    /// <summary>Задаёт порядок вывода в списке.</summary>
+    /// <param name="sortOrder">Неотрицательный порядок.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Порядок отрицательный.</exception>
+    public void SetSortOrder(int sortOrder)
+    {
+        if (sortOrder < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(sortOrder),
+                "Порядок вывода не может быть отрицательным.");
+        }
+
+        SortOrder = sortOrder;
+    }
+
+    /// <summary>Делает категорию доступной для выбора.</summary>
+    public void Activate() => IsActive = true;
+
+    /// <summary>Скрывает категорию из выбора, не затрагивая существующие объявления.</summary>
+    public void Deactivate() => IsActive = false;
+
+    /// <summary>Создаёт раздел верхнего уровня.</summary>
+    /// <param name="name">Название раздела.</param>
+    /// <param name="sortOrder">Порядок вывода.</param>
+    public static Category CreateSection(string name, int sortOrder)
+    {
+        var section = new Category();
+        section.Rename(name);
+        section.SetSortOrder(sortOrder);
+        return section;
+    }
+
+    /// <summary>Создаёт подраздел в разделе верхнего уровня.</summary>
+    /// <param name="section">Раздел верхнего уровня.</param>
+    /// <param name="name">Название подраздела.</param>
+    /// <param name="sortOrder">Порядок вывода.</param>
+    /// <exception cref="InvalidOperationException">Родитель не является разделом.</exception>
+    public static Category CreateSubsection(Category section, string name, int sortOrder = 0)
+    {
+        var subsection = new Category();
+        subsection.Rename(name);
+        subsection.SetSortOrder(sortOrder);
+        subsection.SetParent(section);
+        return subsection;
+    }
+
     /// <summary>
     /// Назначает родителя, соблюдая правило «подраздел не может быть родителем»:
     /// глубина каталога ограничена двумя уровнями.
@@ -54,6 +125,12 @@ public class Category : Entity
         {
             throw new InvalidOperationException(
                 "Подраздел не может быть родителем: каталог ограничен двумя уровнями.");
+        }
+
+        if (Children.Count > 0)
+        {
+            throw new InvalidOperationException(
+                "Раздел с подразделами нельзя сделать подразделом.");
         }
 
         Parent = parent;

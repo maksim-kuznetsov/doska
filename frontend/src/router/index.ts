@@ -4,6 +4,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import DefaultLayout from '../layouts/DefaultLayout.vue'
 import { useAuthStore } from '../stores/auth'
 import AdFormView from '../views/AdFormView.vue'
+import AdminCategoriesView from '../views/AdminCategoriesView.vue'
 import ComplaintsQueueView from '../views/ComplaintsQueueView.vue'
 import ConfirmEmailView from '../views/ConfirmEmailView.vue'
 import HomeView from '../views/HomeView.vue'
@@ -61,6 +62,12 @@ const routes: RouteRecordRaw[] = [
         component: ComplaintsQueueView,
         meta: { requiresModerator: true },
       },
+      {
+        path: 'admin/categories',
+        name: 'admin-categories',
+        component: AdminCategoriesView,
+        meta: { requiresAdmin: true },
+      },
     ],
   },
 ]
@@ -92,6 +99,16 @@ router.beforeEach(async (to) => {
 
   if (to.meta.requiresModerator === true && !auth.canModerate) {
     return { name: 'home' }
+  }
+
+  if (to.meta.requiresAdmin === true) {
+    if (!auth.isAuthenticated) {
+      return { name: 'login', query: { redirect: to.fullPath } }
+    }
+
+    if (!auth.isAdmin) {
+      return { name: 'home' }
+    }
   }
 
   return true
