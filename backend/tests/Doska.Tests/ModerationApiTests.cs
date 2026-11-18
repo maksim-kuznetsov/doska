@@ -19,6 +19,18 @@ public sealed class ModerationApiTests : IClassFixture<ApiFactory>, IAsyncLifeti
     private const string TestSubsectionPrefix = "Подраздел ";
     private const string TestCityPrefix = "Город ";
 
+    private static readonly string[] TestUserPrefixes =
+    [
+        "author-",
+        "plain-",
+        "trusted-",
+        "seller-",
+        "reporter-",
+        "manual-",
+        "moderator-",
+        "admin-",
+    ];
+
     private readonly ApiFactory _factory;
 
     public ModerationApiTests(ApiFactory factory)
@@ -53,10 +65,11 @@ public sealed class ModerationApiTests : IClassFixture<ApiFactory>, IAsyncLifeti
             db.Cities.RemoveRange(db.Cities.Where(city => city.Name.StartsWith(TestCityPrefix)));
             await db.SaveChangesAsync(ct);
 
-            db.Users.RemoveRange(
-                db.Users.Where(user => EF.Functions.Like(
-                    user.Email,
-                    "%-________________________________@example.com")));
+            foreach (var prefix in TestUserPrefixes)
+            {
+                db.Users.RemoveRange(db.Users.Where(user => user.Email.StartsWith(prefix)));
+            }
+
             await db.SaveChangesAsync(ct);
         });
     }

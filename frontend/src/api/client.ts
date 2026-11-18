@@ -68,6 +68,48 @@ export interface ComplaintQueueItem {
   createdAt: string
 }
 
+export interface SubsectionOption {
+  id: string
+  name: string
+}
+
+export interface SectionOption {
+  id: string
+  name: string
+  subsections: SubsectionOption[]
+}
+
+export interface AdCard {
+  id: string
+  title: string
+  description: string
+  price: number
+  cityName: string
+  categoryName: string
+  sectionName: string
+  publishedAt: string
+}
+
+export interface PagedResult<T> {
+  items: T[]
+  totalCount: number
+  page: number
+  pageSize: number
+}
+
+export type AdSort = 'newest' | 'price_asc' | 'price_desc'
+
+export interface AdSearchParams {
+  query?: string
+  categoryId?: string
+  cityId?: string
+  minPrice?: number
+  maxPrice?: number
+  sort?: AdSort
+  page?: number
+  pageSize?: number
+}
+
 /** Ошибка API с HTTP-кодом и сообщением из `ProblemDetails`. */
 export class ApiError extends Error {
   readonly status: number
@@ -85,6 +127,22 @@ interface RequestOptions {
 }
 
 const apiBaseUrl = '/api'
+
+function toQueryString(params: AdSearchParams): string {
+  const search = new URLSearchParams()
+
+  if (params.query) search.set('query', params.query)
+  if (params.categoryId) search.set('categoryId', params.categoryId)
+  if (params.cityId) search.set('cityId', params.cityId)
+  if (params.minPrice !== undefined) search.set('minPrice', String(params.minPrice))
+  if (params.maxPrice !== undefined) search.set('maxPrice', String(params.maxPrice))
+  if (params.sort) search.set('sort', params.sort)
+  if (params.page !== undefined) search.set('page', String(params.page))
+  if (params.pageSize !== undefined) search.set('pageSize', String(params.pageSize))
+
+  const query = search.toString()
+  return query.length > 0 ? `?${query}` : ''
+}
 
 /** Кэш не используется: токен привязан к текущей сессии и запрашивается перед изменяющим запросом. */
 async function fetchCsrfToken(): Promise<string> {
@@ -150,8 +208,10 @@ export const api = {
   catalog: {
     cities: () => request<CityOption[]>('/catalog/cities'),
     categories: () => request<CategoryOption[]>('/catalog/categories'),
+    sections: () => request<SectionOption[]>('/catalog/sections'),
   },
   ads: {
+    search: (params: AdSearchParams) => request<PagedResult<AdCard>>(`/ads${toQueryString(params)}`),
     create: (payload: CreateAdPayload) => request<AdSummary>('/ads', { method: 'POST', body: payload }),
     mine: () => request<AdSummary[]>('/ads/mine'),
   },

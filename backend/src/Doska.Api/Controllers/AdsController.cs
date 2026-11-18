@@ -11,8 +11,41 @@ namespace Doska.Api.Controllers;
 [ApiController]
 [Route("api/ads")]
 [Authorize]
-public sealed class AdsController(AdService adService) : ControllerBase
+public sealed class AdsController(AdService adService, AdSearchService adSearchService) : ControllerBase
 {
+    /// <summary>Публичная лента и поиск по активным объявлениям.</summary>
+    [HttpGet]
+    [AllowAnonymous]
+    public async Task<ActionResult<PagedResultResponse<AdCardResponse>>> Search(
+        [FromQuery] AdSearchRequest request,
+        CancellationToken cancellationToken)
+    {
+        var sort = request.Sort?.Trim().ToLowerInvariant() switch
+        {
+            "price_asc" => AdSort.PriceAscending,
+            "price_desc" => AdSort.PriceDescending,
+            _ => AdSort.Newest,
+        };
+
+        var query = new AdSearchQuery(
+            request.Query,
+            request.CategoryId,
+            request.CityId,
+            request.MinPrice,
+            request.MaxPrice,
+            sort,
+            request.Page ?? 1,
+            request.PageSize ?? AdSearchService.DefaultPageSize);
+
+        var result = await adSearchService.SearchAsync(query, cancellationToken);
+
+        return Ok(new PagedResultResponse<AdCardResponse>(
+            result.Items.Select(AdCardResponse.From).ToList(),
+            result.TotalCount,
+            result.Page,
+            result.PageSize));
+    }
+
     /// <summary>Создаёт объявление от имени текущего пользователя.</summary>
     [HttpPost]
     [EnableRateLimiting(RateLimitPolicies.Sensitive)]

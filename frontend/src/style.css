@@ -106,6 +106,10 @@ a {
   list-style: none;
 }
 
+.feed {
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+}
+
 .card {
   display: grid;
   gap: 0.5rem;

@@ -19,4 +19,9 @@ public sealed class CatalogController(CatalogService catalogService) : Controlle
     [HttpGet("categories")]
     public async Task<ActionResult<IReadOnlyList<CategoryOption>>> Categories(CancellationToken cancellationToken)
         => Ok(await catalogService.GetSubsectionsAsync(cancellationToken));
+
+    /// <summary>Активные разделы верхнего уровня с подразделами.</summary>
+    [HttpGet("sections")]
+    public async Task<ActionResult<IReadOnlyList<SectionOption>>> Sections(CancellationToken cancellationToken)
+        => Ok(await catalogService.GetSectionsAsync(cancellationToken));
 }

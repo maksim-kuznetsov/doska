@@ -46,6 +46,7 @@ else
 
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<AdService>();
+builder.Services.AddScoped<AdSearchService>();
 builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<ModerationService>();
 builder.Services.AddScoped<ComplaintService>();
