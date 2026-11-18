@@ -4,6 +4,10 @@ import { defineConfig } from 'vitest/config'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue()],
+  build: {
+    // Манифест сборки: по нему определяются хешированные имена ассетов.
+    manifest: true,
+  },
   server: {
     port: 5173,
     proxy: {
