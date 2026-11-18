@@ -138,6 +138,12 @@ export interface CategorySectionView {
   subsections: CategoryItemView[]
 }
 
+export interface CityAdminView {
+  id: string
+  name: string
+  isActive: boolean
+}
+
 /** Ошибка API с HTTP-кодом и сообщением из `ProblemDetails`. */
 export class ApiError extends Error {
   readonly status: number
@@ -311,5 +317,17 @@ export const api = {
         { method: 'POST' },
       ),
     remove: (id: string) => request<void>(`/admin/categories/${id}`, { method: 'DELETE' }),
+  },
+  adminCities: {
+    list: () => request<CityAdminView[]>('/admin/cities'),
+    create: (name: string) =>
+      request<CityAdminView>('/admin/cities', { method: 'POST', body: { name } }),
+    rename: (id: string, name: string) =>
+      request<CityAdminView>(`/admin/cities/${id}`, { method: 'PUT', body: { name } }),
+    setActive: (id: string, isActive: boolean) =>
+      request<CityAdminView>(`/admin/cities/${id}/${isActive ? 'activate' : 'deactivate'}`, {
+        method: 'POST',
+      }),
+    remove: (id: string) => request<void>(`/admin/cities/${id}`, { method: 'DELETE' }),
   },
 }

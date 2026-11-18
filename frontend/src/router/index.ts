@@ -6,6 +6,7 @@ import { useAuthStore } from '../stores/auth'
 import AdEditView from '../views/AdEditView.vue'
 import AdFormView from '../views/AdFormView.vue'
 import AdminCategoriesView from '../views/AdminCategoriesView.vue'
+import AdminCitiesView from '../views/AdminCitiesView.vue'
 import ComplaintsQueueView from '../views/ComplaintsQueueView.vue'
 import ConfirmEmailView from '../views/ConfirmEmailView.vue'
 import DesignSystemGuide from '../views/DesignSystemGuide.vue'
@@ -74,6 +75,12 @@ const routes: RouteRecordRaw[] = [
         path: 'admin/categories',
         name: 'admin-categories',
         component: AdminCategoriesView,
+        meta: { requiresAdmin: true },
+      },
+      {
+        path: 'admin/cities',
+        name: 'admin-cities',
+        component: AdminCitiesView,
         meta: { requiresAdmin: true },
       },
     ],
