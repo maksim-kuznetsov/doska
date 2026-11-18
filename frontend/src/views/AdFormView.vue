@@ -1,25 +1,36 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { ApiError, api, type CategoryOption, type CityOption } from '../api/client'
-import { ACCEPTED_PHOTO_TYPES, MAX_PHOTOS, selectPhotos } from '../api/photos'
+import { ApiError, api, type CityOption, type SectionOption } from '../api/client'
+import AppButton from '../components/AppButton.vue'
+import AppMessage from '../components/AppMessage.vue'
+import FormErrors from '../components/FormErrors.vue'
+import FormGrid from '../components/FormGrid.vue'
+import FormGridItem from '../components/FormGridItem.vue'
+import FormLayout from '../components/FormLayout.vue'
+import FormSection from '../components/FormSection.vue'
+import PhotoUploader from '../components/PhotoUploader.vue'
+import SelectField from '../components/SelectField.vue'
+import SubsectionSelect from '../components/SubsectionSelect.vue'
+import TextAreaField from '../components/TextAreaField.vue'
+import TextField from '../components/TextField.vue'
+import type { FormError } from '../components/formErrors'
 
 const router = useRouter()
 
 const cities = ref<CityOption[]>([])
-const categories = ref<CategoryOption[]>([])
+const sections = ref<SectionOption[]>([])
 const error = ref('')
-const photoError = ref('')
 const catalogError = ref('')
 const submitting = ref(false)
 const photos = ref<File[]>([])
-const previews = ref<string[]>([])
+const formErrors = ref<FormError[]>([])
 
 const form = reactive({
   title: '',
   description: '',
-  price: 0,
+  price: '',
   cityId: '',
   categoryId: '',
   contacts: '',
@@ -27,48 +38,56 @@ const form = reactive({
 
 onMounted(async () => {
   try {
-    const [cityList, categoryList] = await Promise.all([
+    const [cityList, sectionList] = await Promise.all([
       api.catalog.cities(),
-      api.catalog.categories(),
+      api.catalog.sections(),
     ])
     cities.value = cityList
-    categories.value = categoryList
+    sections.value = sectionList
   } catch {
     catalogError.value = 'Не удалось загрузить города и категории.'
   }
 })
 
-onBeforeUnmount(() => {
-  previews.value.forEach((url) => URL.revokeObjectURL(url))
-})
+function validate(): FormError[] {
+  const errors: FormError[] = []
 
-function onFileInput(event: Event): void {
-  const input = event.target as HTMLInputElement
-
-  if (input.files) {
-    const result = selectPhotos(photos.value, Array.from(input.files))
-    const added = result.accepted.slice(photos.value.length)
-
-    photos.value = result.accepted
-    added.forEach((file) => previews.value.push(URL.createObjectURL(file)))
-    photoError.value = result.rejected.join('; ')
+  if (form.title.trim().length === 0) {
+    errors.push({ fieldId: 'ad-title', label: 'Укажите заголовок.' })
   }
 
-  input.value = ''
-}
+  if (form.description.trim().length === 0) {
+    errors.push({ fieldId: 'ad-description', label: 'Добавьте описание.' })
+  }
 
-function removePhoto(index: number): void {
-  URL.revokeObjectURL(previews.value[index])
-  previews.value.splice(index, 1)
-  photos.value.splice(index, 1)
-  photoError.value = ''
+  if (!form.cityId) {
+    errors.push({ fieldId: 'ad-city', label: 'Выберите город.' })
+  }
+
+  if (!form.categoryId) {
+    errors.push({ fieldId: 'ad-category', label: 'Выберите подраздел.' })
+  }
+
+  if (form.contacts.trim().length === 0) {
+    errors.push({ fieldId: 'ad-contacts', label: 'Укажите контакты.' })
+  }
+
+  if (form.price.trim().length === 0) {
+    errors.push({ fieldId: 'ad-price', label: 'Укажите цену.' })
+  }
+
+  if (photos.value.length === 0) {
+    errors.push({ fieldId: 'ad-photos', label: 'Приложите хотя бы одну фотографию.' })
+  }
+
+  return errors
 }
 
 async function submit(): Promise<void> {
   error.value = ''
+  formErrors.value = validate()
 
-  if (photos.value.length === 0) {
-    error.value = 'Приложите хотя бы одну фотографию.'
+  if (formErrors.value.length > 0) {
     return
   }
 
@@ -78,7 +97,7 @@ async function submit(): Promise<void> {
     const data = new FormData()
     data.append('title', form.title)
     data.append('description', form.description)
-    data.append('price', String(form.price))
+    data.append('price', form.price)
     data.append('cityId', form.cityId)
     data.append('categoryId', form.categoryId)
     data.append('contacts', form.contacts)
@@ -96,103 +115,96 @@ async function submit(): Promise<void> {
 
 <template>
   <section class="page">
-    <h1>Подать объявление</h1>
+    <div class="page__head">
+      <h1 class="page__title">Подать объявление</h1>
+    </div>
 
-    <p v-if="catalogError" class="error">{{ catalogError }}</p>
+    <AppMessage v-if="catalogError" variant="error">{{ catalogError }}</AppMessage>
 
-    <form class="form" @submit.prevent="submit">
-      <label class="field">
-        <span class="field__label">Заголовок</span>
-        <input v-model="form.title" class="field__input" type="text" maxlength="200" required />
-      </label>
+    <form @submit.prevent="submit">
+      <FormLayout>
+        <FormErrors :errors="formErrors" />
 
-      <label class="field">
-        <span class="field__label">Описание</span>
-        <textarea v-model="form.description" class="field__input" rows="5" required></textarea>
-      </label>
+        <FormSection title="Описание">
+          <TextField
+            v-model="form.title"
+            label="Заголовок"
+            input-id="ad-title"
+            :maxlength="200"
+            required
+          />
+          <TextAreaField
+            v-model="form.description"
+            label="Описание"
+            input-id="ad-description"
+            :rows="5"
+            required
+          />
+        </FormSection>
 
-      <label class="field">
-        <span class="field__label">Цена, ₽</span>
-        <input v-model.number="form.price" class="field__input" type="number" min="0" step="1" required />
-      </label>
+        <FormSection title="Размещение">
+          <FormGrid>
+            <FormGridItem>
+              <TextField
+                v-model="form.price"
+                label="Цена, ₽"
+                input-id="ad-price"
+                type="number"
+                min="0"
+                step="1"
+                required
+              />
+            </FormGridItem>
+            <FormGridItem>
+              <SelectField
+                v-model="form.cityId"
+                label="Город"
+                input-id="ad-city"
+                required
+              >
+                <option value="" disabled>Выберите город</option>
+                <option v-for="city in cities" :key="city.id" :value="city.id">
+                  {{ city.name }}
+                </option>
+              </SelectField>
+            </FormGridItem>
+            <FormGridItem wide>
+              <SubsectionSelect
+                v-model="form.categoryId"
+                input-id="ad-category"
+                :sections="sections"
+                required
+              />
+            </FormGridItem>
+            <FormGridItem wide>
+              <TextField
+                v-model="form.contacts"
+                label="Контакты"
+                input-id="ad-contacts"
+                :maxlength="500"
+                required
+              />
+            </FormGridItem>
+          </FormGrid>
+        </FormSection>
 
-      <label class="field">
-        <span class="field__label">Город</span>
-        <select v-model="form.cityId" class="field__input" required>
-          <option disabled value="">Выберите город</option>
-          <option v-for="city in cities" :key="city.id" :value="city.id">{{ city.name }}</option>
-        </select>
-      </label>
+        <FormSection title="Фотографии">
+          <PhotoUploader v-model:files="photos" input-id="ad-photos" />
+        </FormSection>
 
-      <label class="field">
-        <span class="field__label">Подраздел</span>
-        <select v-model="form.categoryId" class="field__input" required>
-          <option disabled value="">Выберите подраздел</option>
-          <option v-for="category in categories" :key="category.id" :value="category.id">
-            {{ category.sectionName }} — {{ category.name }}
-          </option>
-        </select>
-      </label>
-
-      <label class="field">
-        <span class="field__label">Контакты</span>
-        <input v-model="form.contacts" class="field__input" type="text" maxlength="500" required />
-      </label>
-
-      <div class="field">
-        <span class="field__label">Фотографии ({{ photos.length }}/{{ MAX_PHOTOS }})</span>
-        <input
-          class="field__input"
-          type="file"
-          :accept="ACCEPTED_PHOTO_TYPES.join(',')"
-          multiple
-          @change="onFileInput"
-        />
-        <span class="muted">JPEG, PNG или WebP, до 5 МБ, от 1 до 5 фотографий.</span>
-        <p v-if="photoError" class="error">{{ photoError }}</p>
-      </div>
-
-      <ul v-if="previews.length > 0" class="previews">
-        <li v-for="(url, index) in previews" :key="url" class="preview">
-          <img :src="url" alt="Превью фотографии" />
-          <button type="button" class="button" @click="removePhoto(index)">Удалить</button>
-        </li>
-      </ul>
-
-      <p class="muted">
-        Объявление пользователя без доверия попадёт на проверку. Доверенный автор публикуется сразу.
-      </p>
-
-      <p v-if="error" class="error">{{ error }}</p>
-
-      <button class="button button--primary" type="submit" :disabled="submitting">
-        {{ submitting ? 'Отправляем…' : 'Отправить' }}
-      </button>
+        <template #aside>
+          <p class="form-layout__aside-text">
+            Объявление пользователя без доверия попадёт на проверку. Доверенный автор публикуется
+            сразу.
+          </p>
+          <AppMessage v-if="error" variant="error">{{ error }}</AppMessage>
+          <div class="form-layout__actions">
+            <AppButton variant="primary" type="submit" block :disabled="submitting">
+              {{ submitting ? 'Отправляем…' : 'Отправить' }}
+            </AppButton>
+          </div>
+        </template>
+      </FormLayout>
     </form>
   </section>
 </template>
-
-<style scoped>
-.previews {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.preview {
-  display: grid;
-  gap: 0.35rem;
-  justify-items: start;
-}
-
-.preview img {
-  width: 8rem;
-  height: 6rem;
-  object-fit: cover;
-  border-radius: 0.4rem;
-  border: 1px solid currentColor;
-}
-</style>

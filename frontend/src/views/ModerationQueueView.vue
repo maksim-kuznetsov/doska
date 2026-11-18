@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 
 import { ApiError, api, type ModerationQueueItem } from '../api/client'
+import AppMessage from '../components/AppMessage.vue'
 import ModerationQueueList from '../components/ModerationQueueList.vue'
 
 const items = ref<ModerationQueueItem[]>([])
@@ -51,17 +52,14 @@ onMounted(load)
 
 <template>
   <section class="page">
-    <h1>Очередь проверки</h1>
+    <div class="page__head">
+      <h1 class="page__title">Очередь проверки</h1>
+    </div>
 
-    <p v-if="loading" class="muted">Загружаем…</p>
-    <p v-if="notice" class="notice">{{ notice }}</p>
-    <p v-if="error" class="error">{{ error }}</p>
+    <p v-if="loading" class="text-muted">Загружаем…</p>
+    <AppMessage v-if="notice" variant="success">{{ notice }}</AppMessage>
+    <AppMessage v-if="error" variant="error">{{ error }}</AppMessage>
 
-    <ModerationQueueList
-      :items="items"
-      @approve="approve"
-      @reject="reject"
-      @hide="hide"
-    />
+    <ModerationQueueList :items="items" @approve="approve" @reject="reject" @hide="hide" />
   </section>
 </template>

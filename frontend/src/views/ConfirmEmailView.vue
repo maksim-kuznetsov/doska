@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { ApiError, api } from '../api/client'
+import AppMessage from '../components/AppMessage.vue'
 
 const route = useRoute()
 const state = ref<'pending' | 'done' | 'failed'>('pending')
@@ -30,12 +31,14 @@ onMounted(async () => {
 
 <template>
   <section class="page page--narrow">
-    <h1>Подтверждение email</h1>
-    <p :class="state === 'failed' ? 'error' : state === 'done' ? 'notice' : 'muted'">
-      {{ message }}
-    </p>
-    <p class="muted">
-      <RouterLink to="/ads/mine">Перейти к объявлениям</RouterLink>
+    <h1 class="page__title">Подтверждение email</h1>
+
+    <AppMessage v-if="state === 'failed'" variant="error">{{ message }}</AppMessage>
+    <AppMessage v-else-if="state === 'done'" variant="success">{{ message }}</AppMessage>
+    <p v-else class="text-muted">{{ message }}</p>
+
+    <p>
+      <RouterLink class="link" to="/ads/mine">Перейти к объявлениям</RouterLink>
     </p>
   </section>
 </template>

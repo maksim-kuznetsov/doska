@@ -1,0 +1,31 @@
+<script setup lang="ts">
+import type { AdCard as AdCardModel } from '../api/client'
+
+/** Карточка объявления для ленты и списков. */
+defineProps<{ ad: AdCardModel }>()
+
+function formatDate(value: string): string {
+  return new Date(value).toLocaleDateString('ru-RU')
+}
+</script>
+
+<template>
+  <article class="ad-card" data-test="ad-card">
+    <div class="ad-card__media">
+      <img v-if="ad.thumbnailUrl" class="ad-card__image" :src="ad.thumbnailUrl" :alt="ad.title" />
+      <div v-else class="ad-card__placeholder" aria-hidden="true">Нет фото</div>
+    </div>
+
+    <div class="ad-card__body">
+      <div class="ad-card__head">
+        <h2 class="ad-card__title">{{ ad.title }}</h2>
+        <span class="ad-card__price">{{ ad.price }} ₽</span>
+      </div>
+      <p class="ad-card__meta">
+        {{ ad.sectionName }} — {{ ad.categoryName }} · {{ ad.cityName }}
+      </p>
+      <p class="ad-card__description">{{ ad.description }}</p>
+      <p class="ad-card__date">{{ formatDate(ad.publishedAt) }}</p>
+    </div>
+  </article>
+</template>

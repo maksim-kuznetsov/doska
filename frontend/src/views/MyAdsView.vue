@@ -2,24 +2,16 @@
 import { onMounted, ref } from 'vue'
 
 import { ApiError, api, type AdSummary } from '../api/client'
+import ActionLink from '../components/ActionLink.vue'
+import AdRow from '../components/AdRow.vue'
+import AppButton from '../components/AppButton.vue'
+import AppMessage from '../components/AppMessage.vue'
+import EmptyState from '../components/EmptyState.vue'
 
 const ads = ref<AdSummary[]>([])
 const error = ref('')
 const notice = ref('')
 const loading = ref(false)
-
-const statusLabels: Record<string, string> = {
-  OnModeration: 'На проверке',
-  Active: 'Активно',
-  Sold: 'Продано',
-  Archived: 'Архив',
-  Rejected: 'Отклонено',
-  Hidden: 'Скрыто',
-}
-
-function statusLabel(status: string): string {
-  return statusLabels[status] ?? status
-}
 
 async function load(): Promise<void> {
   loading.value = true
@@ -84,79 +76,43 @@ onMounted(load)
 <template>
   <section class="page">
     <div class="page__head">
-      <h1>Мои объявления</h1>
-      <RouterLink class="button button--primary" to="/ads/new">Подать объявление</RouterLink>
+      <h1 class="page__title">Мои объявления</h1>
+      <ActionLink to="/ads/new">Подать объявление</ActionLink>
     </div>
 
-    <p v-if="loading" class="muted">Загружаем…</p>
-    <p v-if="notice" class="notice">{{ notice }}</p>
-    <p v-if="error" class="error">{{ error }}</p>
-    <p v-if="!loading && !error && ads.length === 0" class="muted">Объявлений пока нет.</p>
+    <p v-if="loading" class="text-muted">Загружаем…</p>
+    <AppMessage v-if="notice" variant="success">{{ notice }}</AppMessage>
+    <AppMessage v-if="error" variant="error">{{ error }}</AppMessage>
 
-    <ul v-if="ads.length > 0" class="list">
-      <li v-for="ad in ads" :key="ad.id" class="card" data-test="my-ad">
-        <div class="card__head">
-          <h2 class="card__title">{{ ad.title }}</h2>
-          <span class="badge">{{ statusLabel(ad.status) }}</span>
-        </div>
+    <EmptyState
+      v-if="!loading && !error && ads.length === 0"
+      title="Объявлений пока нет"
+      description="Подайте первое объявление — оно появится здесь со своим статусом."
+    />
 
-        <div class="ad-row">
-          <img
-            v-if="ad.photos.length > 0"
-            class="ad-thumb"
-            :src="ad.photos[0].thumbnailUrl"
-            :alt="ad.title"
-          />
-          <div v-else class="ad-thumb ad-thumb--empty" aria-hidden="true">Нет фото</div>
-
-          <div class="ad-info">
-            <p class="card__text">{{ ad.price }} ₽ · {{ ad.contacts }}</p>
-            <p v-if="ad.moderationReason" class="error">Причина: {{ ad.moderationReason }}</p>
-          </div>
-        </div>
-
-        <div class="actions">
-          <RouterLink class="button" :to="`/ads/${ad.id}/edit`">Редактировать</RouterLink>
-          <button v-if="canSell(ad.status)" type="button" class="button" @click="markSold(ad)">
+    <div v-if="ads.length > 0" class="ad-list">
+      <AdRow v-for="ad in ads" :key="ad.id" :ad="ad">
+        <template #actions>
+          <RouterLink class="btn btn--secondary btn--compact" :to="`/ads/${ad.id}/edit`">
+            Редактировать
+          </RouterLink>
+          <AppButton v-if="canSell(ad.status)" size="compact" variant="secondary" @click="markSold(ad)">
             Продано
-          </button>
-          <button v-if="canReturn(ad.status)" type="button" class="button" @click="returnToSale(ad)">
+          </AppButton>
+          <AppButton
+            v-if="canReturn(ad.status)"
+            size="compact"
+            variant="secondary"
+            @click="returnToSale(ad)"
+          >
             Вернуть в продажу
-          </button>
-          <button v-if="canRenew(ad.status)" type="button" class="button" @click="renew(ad)">
+          </AppButton>
+          <AppButton v-if="canRenew(ad.status)" size="compact" variant="secondary" @click="renew(ad)">
             Продлить
-          </button>
-          <button type="button" class="button button--danger" @click="remove(ad)">Удалить</button>
-        </div>
-      </li>
-    </ul>
+          </AppButton>
+          <AppButton size="compact" variant="danger" @click="remove(ad)">Удалить</AppButton>
+        </template>
+      </AdRow>
+    </div>
   </section>
 </template>
-
-<style scoped>
-.ad-row {
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
-}
-
-.ad-thumb {
-  width: 8rem;
-  height: 6rem;
-  object-fit: cover;
-  border-radius: 0.4rem;
-  border: 1px solid currentColor;
-}
-
-.ad-thumb--empty {
-  display: grid;
-  place-items: center;
-  font-size: 0.8rem;
-  opacity: 0.6;
-}
-
-.ad-info {
-  display: grid;
-  gap: 0.35rem;
-}
-</style>

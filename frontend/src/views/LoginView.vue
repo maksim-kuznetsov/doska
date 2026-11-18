@@ -3,6 +3,9 @@ import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { ApiError } from '../api/client'
+import AppButton from '../components/AppButton.vue'
+import AppMessage from '../components/AppMessage.vue'
+import TextField from '../components/TextField.vue'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -32,35 +35,37 @@ async function submit(): Promise<void> {
 
 <template>
   <section class="page page--narrow">
-    <h1>Вход</h1>
+    <h1 class="page__title">Вход</h1>
 
-    <form class="form" @submit.prevent="submit">
-      <label class="field">
-        <span class="field__label">Email</span>
-        <input v-model="email" class="field__input" type="email" autocomplete="email" required />
-      </label>
+    <form class="stack" @submit.prevent="submit">
+      <TextField
+        v-model="email"
+        label="Email"
+        input-id="login-email"
+        type="email"
+        autocomplete="email"
+        required
+      />
 
-      <label class="field">
-        <span class="field__label">Пароль</span>
-        <input
-          v-model="password"
-          class="field__input"
-          type="password"
-          autocomplete="current-password"
-          required
-        />
-      </label>
+      <TextField
+        v-model="password"
+        label="Пароль"
+        input-id="login-password"
+        type="password"
+        autocomplete="current-password"
+        required
+      />
 
-      <p v-if="error" class="error">{{ error }}</p>
+      <AppMessage v-if="error" variant="error">{{ error }}</AppMessage>
 
-      <button class="button button--primary" type="submit" :disabled="submitting">
+      <AppButton variant="primary" type="submit" block :disabled="submitting">
         {{ submitting ? 'Входим…' : 'Войти' }}
-      </button>
+      </AppButton>
     </form>
 
-    <p class="muted">
+    <p class="text-muted">
       Нет аккаунта?
-      <RouterLink to="/register">Зарегистрироваться</RouterLink>
+      <RouterLink class="link" to="/register">Зарегистрироваться</RouterLink>
     </p>
   </section>
 </template>

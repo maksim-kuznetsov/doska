@@ -7,17 +7,24 @@ import {
   type CategoryItemView,
   type CategorySectionView,
 } from '../api/client'
+import AppButton from '../components/AppButton.vue'
+import AppMessage from '../components/AppMessage.vue'
+import FormGrid from '../components/FormGrid.vue'
+import FormGridItem from '../components/FormGridItem.vue'
+import FormSection from '../components/FormSection.vue'
+import StatusBadge from '../components/StatusBadge.vue'
+import TextField from '../components/TextField.vue'
 
 interface Draft {
   name: string
-  sortOrder: number
+  sortOrder: string
 }
 
 const sections = ref<CategorySectionView[]>([])
 const drafts = ref<Record<string, Draft>>({})
 const newSubsections = reactive<Record<string, Draft>>({})
 const newSectionName = ref('')
-const newSectionOrder = ref(0)
+const newSectionOrder = ref('')
 const error = ref('')
 const notice = ref('')
 const loading = ref(false)
@@ -30,11 +37,14 @@ function rebuildDrafts(): void {
   const next: Record<string, Draft> = {}
 
   for (const section of sections.value) {
-    next[section.id] = { name: section.name, sortOrder: section.sortOrder }
-    newSubsections[section.id] ??= { name: '', sortOrder: 0 }
+    next[section.id] = { name: section.name, sortOrder: String(section.sortOrder) }
+    newSubsections[section.id] ??= { name: '', sortOrder: '' }
 
     for (const subsection of section.subsections) {
-      next[subsection.id] = { name: subsection.name, sortOrder: subsection.sortOrder }
+      next[subsection.id] = {
+        name: subsection.name,
+        sortOrder: String(subsection.sortOrder),
+      }
     }
   }
 
@@ -68,7 +78,7 @@ async function run(action: () => Promise<unknown>, success: string): Promise<voi
 }
 
 function draftFor(id: string): Draft {
-  return drafts.value[id] ?? { name: '', sortOrder: 0 }
+  return drafts.value[id] ?? { name: '', sortOrder: '' }
 }
 
 function createSection(): void {
@@ -79,9 +89,9 @@ function createSection(): void {
   }
 
   void run(async () => {
-    await api.adminCategories.createSection(name, Number(newSectionOrder.value))
+    await api.adminCategories.createSection(name, Number(newSectionOrder.value) || 0)
     newSectionName.value = ''
-    newSectionOrder.value = 0
+    newSectionOrder.value = ''
   }, 'Раздел создан.')
 }
 
@@ -96,17 +106,17 @@ function createSubsection(sectionId: string): void {
     await api.adminCategories.createSubsection(
       sectionId,
       draft.name.trim(),
-      Number(draft.sortOrder),
+      Number(draft.sortOrder) || 0,
     )
     draft.name = ''
-    draft.sortOrder = 0
+    draft.sortOrder = ''
   }, 'Подраздел создан.')
 }
 
 function save(id: string): void {
   const draft = draftFor(id)
   void run(
-    () => api.adminCategories.update(id, draft.name.trim(), Number(draft.sortOrder)),
+    () => api.adminCategories.update(id, draft.name.trim(), Number(draft.sortOrder) || 0),
     'Категория сохранена.',
   )
 }
@@ -132,147 +142,147 @@ onMounted(load)
 <template>
   <section class="page">
     <div class="page__head">
-      <h1>Категории</h1>
-      <span class="muted">Управление доступно администратору</span>
+      <h1 class="page__title">Категории</h1>
+      <span class="text-muted">Управление доступно администратору</span>
     </div>
 
-    <p v-if="notice" class="notice">{{ notice }}</p>
-    <p v-if="error" class="error">{{ error }}</p>
+    <AppMessage v-if="notice" variant="success">{{ notice }}</AppMessage>
+    <AppMessage v-if="error" variant="error">{{ error }}</AppMessage>
 
-    <form class="form card" @submit.prevent="createSection">
-      <h2 class="card__title">Новый раздел</h2>
-      <div class="category-row">
-        <label class="field">
-          <span class="field__label">Название</span>
-          <input v-model="newSectionName" class="field__input" type="text" required />
-        </label>
-        <label class="field field--order">
-          <span class="field__label">Порядок</span>
-          <input v-model.number="newSectionOrder" class="field__input" type="number" min="0" />
-        </label>
-        <button class="button button--primary" type="submit">Создать раздел</button>
-      </div>
-    </form>
-
-    <p v-if="loading" class="muted">Загружаем…</p>
-
-    <ul class="list">
-      <li v-for="section in sections" :key="section.id" class="card">
-        <div class="card__head">
-          <h2 class="card__title">{{ section.name }}</h2>
-          <span class="badge">{{ section.isActive ? 'Активен' : 'Неактивен' }}</span>
-        </div>
-
-        <div class="category-row">
-          <label class="field">
-            <span class="field__label">Название</span>
-            <input v-model="drafts[section.id].name" class="field__input" type="text" />
-          </label>
-          <label class="field field--order">
-            <span class="field__label">Порядок</span>
-            <input
-              v-model.number="drafts[section.id].sortOrder"
-              class="field__input"
+    <form @submit.prevent="createSection">
+      <FormSection title="Новый раздел">
+        <FormGrid>
+          <FormGridItem>
+            <TextField
+              v-model="newSectionName"
+              label="Название"
+              input-id="new-section-name"
+              required
+            />
+          </FormGridItem>
+          <FormGridItem>
+            <TextField
+              v-model="newSectionOrder"
+              label="Порядок"
+              input-id="new-section-order"
               type="number"
               min="0"
             />
-          </label>
-          <div class="actions">
-            <button type="button" class="button" @click="save(section.id)">Сохранить</button>
-            <button type="button" class="button" @click="toggle(section)">
-              {{ section.isActive ? 'Деактивировать' : 'Активировать' }}
-            </button>
-            <button type="button" class="button button--danger" @click="remove(section)">
-              Удалить
-            </button>
-          </div>
+          </FormGridItem>
+        </FormGrid>
+        <div>
+          <AppButton variant="primary" type="submit">Создать раздел</AppButton>
+        </div>
+      </FormSection>
+    </form>
+
+    <p v-if="loading" class="text-muted">Загружаем…</p>
+
+    <div class="ad-list">
+      <FormSection v-for="section in sections" :key="section.id" :title="section.name">
+        <div class="split">
+          <StatusBadge :status="section.isActive ? 'Active' : 'Archived'" />
+          <span class="text-muted">Раздел верхнего уровня</span>
         </div>
 
-        <ul class="list">
-          <li
+        <FormGrid>
+          <FormGridItem>
+            <TextField
+              v-model="drafts[section.id].name"
+              label="Название"
+              :input-id="`section-name-${section.id}`"
+            />
+          </FormGridItem>
+          <FormGridItem>
+            <TextField
+              v-model="drafts[section.id].sortOrder"
+              label="Порядок"
+              :input-id="`section-order-${section.id}`"
+              type="number"
+              min="0"
+            />
+          </FormGridItem>
+        </FormGrid>
+
+        <div class="cluster">
+          <AppButton variant="secondary" size="compact" @click="save(section.id)">
+            Сохранить
+          </AppButton>
+          <AppButton variant="secondary" size="compact" @click="toggle(section)">
+            {{ section.isActive ? 'Деактивировать' : 'Активировать' }}
+          </AppButton>
+          <AppButton variant="danger" size="compact" @click="remove(section)">Удалить</AppButton>
+        </div>
+
+        <div class="ad-list">
+          <div
             v-for="subsection in section.subsections"
             :key="subsection.id"
-            class="subsection"
+            class="panel stack stack--compact"
             data-test="admin-subsection"
           >
-            <div class="card__head">
-              <span class="category-row__name">{{ subsection.name }}</span>
-              <span class="badge">{{ subsection.isActive ? 'Активен' : 'Неактивен' }}</span>
+            <div class="split">
+              <span class="ad-row__title">{{ subsection.name }}</span>
+              <StatusBadge :status="subsection.isActive ? 'Active' : 'Archived'" />
             </div>
 
-            <div class="category-row">
-              <label class="field">
-                <span class="field__label">Название</span>
-                <input v-model="drafts[subsection.id].name" class="field__input" type="text" />
-              </label>
-              <label class="field field--order">
-                <span class="field__label">Порядок</span>
-                <input
-                  v-model.number="drafts[subsection.id].sortOrder"
-                  class="field__input"
+            <FormGrid>
+              <FormGridItem>
+                <TextField
+                  v-model="drafts[subsection.id].name"
+                  label="Название"
+                  :input-id="`subsection-name-${subsection.id}`"
+                />
+              </FormGridItem>
+              <FormGridItem>
+                <TextField
+                  v-model="drafts[subsection.id].sortOrder"
+                  label="Порядок"
+                  :input-id="`subsection-order-${subsection.id}`"
                   type="number"
                   min="0"
                 />
-              </label>
-              <div class="actions">
-                <button type="button" class="button" @click="save(subsection.id)">Сохранить</button>
-                <button type="button" class="button" @click="toggle(subsection)">
-                  {{ subsection.isActive ? 'Деактивировать' : 'Активировать' }}
-                </button>
-                <button
-                  type="button"
-                  class="button button--danger"
-                  @click="remove(subsection)"
-                >
-                  Удалить
-                </button>
-              </div>
-            </div>
-          </li>
-        </ul>
+              </FormGridItem>
+            </FormGrid>
 
-        <form class="form category-row" @submit.prevent="createSubsection(section.id)">
-          <label class="field">
-            <span class="field__label">Новый подраздел</span>
-            <input v-model="newSubsections[section.id].name" class="field__input" type="text" />
-          </label>
-          <label class="field field--order">
-            <span class="field__label">Порядок</span>
-            <input
-              v-model.number="newSubsections[section.id].sortOrder"
-              class="field__input"
-              type="number"
-              min="0"
-            />
-          </label>
-          <button class="button" type="submit">Добавить подраздел</button>
+            <div class="cluster">
+              <AppButton variant="secondary" size="compact" @click="save(subsection.id)">
+                Сохранить
+              </AppButton>
+              <AppButton variant="secondary" size="compact" @click="toggle(subsection)">
+                {{ subsection.isActive ? 'Деактивировать' : 'Активировать' }}
+              </AppButton>
+              <AppButton variant="danger" size="compact" @click="remove(subsection)">
+                Удалить
+              </AppButton>
+            </div>
+          </div>
+        </div>
+
+        <form @submit.prevent="createSubsection(section.id)">
+          <FormGrid>
+            <FormGridItem>
+              <TextField
+                v-model="newSubsections[section.id].name"
+                label="Новый подраздел"
+                :input-id="`new-subsection-name-${section.id}`"
+              />
+            </FormGridItem>
+            <FormGridItem>
+              <TextField
+                v-model="newSubsections[section.id].sortOrder"
+                label="Порядок"
+                :input-id="`new-subsection-order-${section.id}`"
+                type="number"
+                min="0"
+              />
+            </FormGridItem>
+          </FormGrid>
+          <div>
+            <AppButton variant="secondary" type="submit">Добавить подраздел</AppButton>
+          </div>
         </form>
-      </li>
-    </ul>
+      </FormSection>
+    </div>
   </section>
 </template>
-
-<style scoped>
-.category-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 0.75rem;
-}
-
-.field--order {
-  max-width: 8rem;
-}
-
-.subsection {
-  display: grid;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  border: 1px solid currentColor;
-  border-radius: 0.4rem;
-}
-
-.category-row__name {
-  font-weight: 600;
-}
-</style>

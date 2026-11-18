@@ -8,6 +8,7 @@ import AdFormView from '../views/AdFormView.vue'
 import AdminCategoriesView from '../views/AdminCategoriesView.vue'
 import ComplaintsQueueView from '../views/ComplaintsQueueView.vue'
 import ConfirmEmailView from '../views/ConfirmEmailView.vue'
+import DesignSystemGuide from '../views/DesignSystemGuide.vue'
 import HomeView from '../views/HomeView.vue'
 import LoginView from '../views/LoginView.vue'
 import ModerationQueueView from '../views/ModerationQueueView.vue'
@@ -78,6 +79,15 @@ const routes: RouteRecordRaw[] = [
     ],
   },
 ]
+
+// Страница-гайд дизайн-системы доступна только в окружении Development.
+if (import.meta.env.DEV) {
+  routes[0].children?.push({
+    path: 'design-system',
+    name: 'design-system',
+    component: DesignSystemGuide,
+  })
+}
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),

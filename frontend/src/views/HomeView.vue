@@ -6,7 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   ApiError,
   api,
-  type AdCard,
+  type AdCard as AdCardModel,
   type CityOption,
   type SectionOption,
 } from '../api/client'
@@ -17,6 +17,12 @@ import {
   toSearchParams,
   type FeedFilters,
 } from '../api/search'
+import AdCard from '../components/AdCard.vue'
+import AppMessage from '../components/AppMessage.vue'
+import EmptyState from '../components/EmptyState.vue'
+import FilterPanel from '../components/FilterPanel.vue'
+import Pagination from '../components/Pagination.vue'
+import ResultsBar from '../components/ResultsBar.vue'
 import { useAppStore } from '../stores/app'
 
 const { appName } = storeToRefs(useAppStore())
@@ -24,7 +30,7 @@ const route = useRoute()
 const router = useRouter()
 
 const filters = reactive<FeedFilters>({ ...defaultFeedFilters })
-const items = ref<AdCard[]>([])
+const items = ref<AdCardModel[]>([])
 const totalCount = ref(0)
 const pageSize = ref(12)
 const loading = ref(false)
@@ -64,16 +70,12 @@ function resetFilters(): void {
   void router.push({ name: 'home', query: {} })
 }
 
-function goToPage(page: number): void {
-  if (page < 1 || page > totalPages.value) {
-    return
-  }
-
-  void router.push({ name: 'home', query: toRouteQuery({ ...filters, page }) })
+function applySort(): void {
+  applyFilters()
 }
 
-function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString('ru-RU')
+function goToPage(page: number): void {
+  void router.push({ name: 'home', query: toRouteQuery({ ...filters, page }) })
 }
 
 watch(
@@ -107,157 +109,54 @@ onMounted(async () => {
 
 <template>
   <section class="page">
-    <h1 class="home__title">{{ appName }}</h1>
-    <p class="muted">Публичная лента активных объявлений: поиск, фильтры и сортировка.</p>
-
-    <form class="filters" @submit.prevent="applyFilters">
-      <label class="field field--wide">
-        <span class="field__label">Поиск</span>
-        <input
-          v-model="filters.query"
-          class="field__input"
-          type="search"
-          placeholder="Что ищем?"
-        />
-      </label>
-
-      <label class="field">
-        <span class="field__label">Раздел</span>
-        <select v-model="filters.categoryId" class="field__input">
-          <option value="">Все разделы</option>
-          <optgroup v-for="section in sections" :key="section.id" :label="section.name">
-            <option :value="section.id">Все: {{ section.name }}</option>
-            <option v-for="sub in section.subsections" :key="sub.id" :value="sub.id">
-              {{ sub.name }}
-            </option>
-          </optgroup>
-        </select>
-      </label>
-
-      <label class="field">
-        <span class="field__label">Город</span>
-        <select v-model="filters.cityId" class="field__input">
-          <option value="">Все города</option>
-          <option v-for="city in cities" :key="city.id" :value="city.id">{{ city.name }}</option>
-        </select>
-      </label>
-
-      <label class="field">
-        <span class="field__label">Цена от</span>
-        <input v-model="filters.minPrice" class="field__input" type="number" min="0" />
-      </label>
-
-      <label class="field">
-        <span class="field__label">Цена до</span>
-        <input v-model="filters.maxPrice" class="field__input" type="number" min="0" />
-      </label>
-
-      <label class="field">
-        <span class="field__label">Сортировка</span>
-        <select v-model="filters.sort" class="field__input">
-          <option value="newest">Сначала новые</option>
-          <option value="price_asc">Цена: по возрастанию</option>
-          <option value="price_desc">Цена: по убыванию</option>
-        </select>
-      </label>
-
-      <div class="actions">
-        <button class="button button--primary" type="submit">Показать</button>
-        <button class="button" type="button" @click="resetFilters">Сбросить</button>
-      </div>
-    </form>
-
-    <p v-if="loading" class="muted">Загружаем…</p>
-    <p v-if="error" class="error">{{ error }}</p>
-
-    <p v-if="!loading && !error && items.length === 0" class="muted" data-test="empty">
-      Ничего не найдено. Фильтры сохранены — измените условия или сбросьте их.
-    </p>
-
-    <ul v-if="items.length > 0" class="list feed">
-      <li v-for="ad in items" :key="ad.id" class="card" data-test="ad-card">
-        <div class="ad-card__media">
-          <img v-if="ad.thumbnailUrl" :src="ad.thumbnailUrl" :alt="ad.title" />
-          <div v-else class="ad-card__placeholder" aria-hidden="true">Нет фото</div>
-        </div>
-
-        <div class="card__head">
-          <h2 class="card__title">{{ ad.title }}</h2>
-          <span class="badge">{{ ad.price }} ₽</span>
-        </div>
-        <p class="card__text muted">
-          {{ ad.sectionName }} — {{ ad.categoryName }} · {{ ad.cityName }}
+    <div class="page__head">
+      <div class="stack stack--compact">
+        <h1 class="page__title">{{ appName }}</h1>
+        <p class="page__subtitle">
+          Публичная лента активных объявлений: поиск, фильтры и сортировка.
         </p>
-        <p class="card__text">{{ ad.description }}</p>
-        <p class="card__text muted">{{ formatDate(ad.publishedAt) }}</p>
-      </li>
-    </ul>
-
-    <div v-if="totalPages > 1" class="pagination">
-      <button
-        class="button"
-        type="button"
-        :disabled="filters.page <= 1"
-        @click="goToPage(filters.page - 1)"
-      >
-        Назад
-      </button>
-      <span class="muted">Страница {{ filters.page }} из {{ totalPages }} · всего {{ totalCount }}</span>
-      <button
-        class="button"
-        type="button"
-        :disabled="filters.page >= totalPages"
-        @click="goToPage(filters.page + 1)"
-      >
-        Вперёд
-      </button>
+      </div>
     </div>
+
+    <FilterPanel
+      :query="filters.query"
+      :category-id="filters.categoryId"
+      :city-id="filters.cityId"
+      :min-price="filters.minPrice"
+      :max-price="filters.maxPrice"
+      :sort="filters.sort"
+      :sections="sections"
+      :cities="cities"
+      @update:query="filters.query = $event"
+      @update:category-id="filters.categoryId = $event"
+      @update:city-id="filters.cityId = $event"
+      @update:min-price="filters.minPrice = $event"
+      @update:max-price="filters.maxPrice = $event"
+      @submit="applyFilters"
+      @reset="resetFilters"
+    />
+
+    <ResultsBar :total="totalCount" :sort="filters.sort" @update:sort="applySort" />
+
+    <p v-if="loading" class="text-muted">Загружаем…</p>
+    <AppMessage v-if="error" variant="error">{{ error }}</AppMessage>
+
+    <EmptyState
+      v-if="!loading && !error && items.length === 0"
+      title="Ничего не найдено"
+      description="Фильтры сохранены — измените условия или сбросьте их."
+    />
+
+    <div v-if="items.length > 0" class="ad-grid">
+      <AdCard v-for="ad in items" :key="ad.id" :ad="ad" />
+    </div>
+
+    <Pagination
+      v-if="totalPages > 1"
+      :page="filters.page"
+      :total-pages="totalPages"
+      :total-count="totalCount"
+      @change="goToPage"
+    />
   </section>
 </template>
-
-<style scoped>
-.home__title {
-  margin: 0;
-}
-
-.filters {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: 0.75rem;
-  align-items: end;
-}
-
-.field--wide {
-  grid-column: 1 / -1;
-}
-
-.pagination {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.ad-card__media {
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  overflow: hidden;
-  border-radius: 0.4rem;
-  border: 1px solid currentColor;
-}
-
-.ad-card__media img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.ad-card__placeholder {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 100%;
-  font-size: 0.85rem;
-  opacity: 0.6;
-}
-</style>

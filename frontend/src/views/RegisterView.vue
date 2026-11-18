@@ -3,7 +3,10 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { ApiError } from '../api/client'
+import AppButton from '../components/AppButton.vue'
+import AppMessage from '../components/AppMessage.vue'
 import PasswordHints from '../components/PasswordHints.vue'
+import TextField from '../components/TextField.vue'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -32,53 +35,53 @@ async function submit(): Promise<void> {
 
 <template>
   <section class="page page--narrow">
-    <h1>Регистрация</h1>
+    <h1 class="page__title">Регистрация</h1>
 
-    <form class="form" @submit.prevent="submit">
-      <label class="field">
-        <span class="field__label">Email</span>
-        <input v-model="email" class="field__input" type="email" autocomplete="email" required />
-      </label>
+    <form class="stack" @submit.prevent="submit">
+      <TextField
+        v-model="email"
+        label="Email"
+        input-id="register-email"
+        type="email"
+        autocomplete="email"
+        required
+      />
 
-      <label class="field">
-        <span class="field__label">Пароль</span>
-        <input
-          v-model="password"
-          class="field__input"
-          type="password"
-          autocomplete="new-password"
-          required
-        />
-      </label>
+      <TextField
+        v-model="password"
+        label="Пароль"
+        input-id="register-password"
+        type="password"
+        autocomplete="new-password"
+        required
+      />
 
-      <label class="field">
-        <span class="field__label">Повторите пароль</span>
-        <input
-          v-model="confirmation"
-          class="field__input"
-          type="password"
-          autocomplete="new-password"
-          required
-        />
-      </label>
+      <TextField
+        v-model="confirmation"
+        label="Повторите пароль"
+        input-id="register-confirmation"
+        type="password"
+        autocomplete="new-password"
+        required
+      />
 
       <PasswordHints :password="password" :confirmation="confirmation" />
 
-      <p class="muted">
+      <p class="text-muted">
         Минимум 8 символов и не только цифры. После регистрации подтвердите email — до этого
         подача объявлений и жалобы недоступны.
       </p>
 
-      <p v-if="error" class="error">{{ error }}</p>
+      <AppMessage v-if="error" variant="error">{{ error }}</AppMessage>
 
-      <button class="button button--primary" type="submit" :disabled="submitting">
+      <AppButton variant="primary" type="submit" block :disabled="submitting">
         {{ submitting ? 'Создаём…' : 'Зарегистрироваться' }}
-      </button>
+      </AppButton>
     </form>
 
-    <p class="muted">
+    <p class="text-muted">
       Уже есть аккаунт?
-      <RouterLink to="/login">Войти</RouterLink>
+      <RouterLink class="link" to="/login">Войти</RouterLink>
     </p>
   </section>
 </template>

@@ -2,6 +2,10 @@
 import { onMounted, reactive, ref } from 'vue'
 
 import { ApiError, api, type ComplaintQueueItem } from '../api/client'
+import AppButton from '../components/AppButton.vue'
+import AppMessage from '../components/AppMessage.vue'
+import EmptyState from '../components/EmptyState.vue'
+import TextAreaField from '../components/TextAreaField.vue'
 
 const complaints = ref<ComplaintQueueItem[]>([])
 const hideReasons = reactive<Record<string, string>>({})
@@ -25,9 +29,8 @@ function hideReasonFor(id: string): string {
   return hideReasons[id] ?? ''
 }
 
-function onReasonInput(id: string, event: Event): void {
-  const target = event.target as HTMLTextAreaElement
-  hideReasons[id] = target.value
+function setHideReason(id: string, value: string): void {
+  hideReasons[id] = value
 }
 
 async function resolve(id: string, hideAd: boolean): Promise<void> {
@@ -36,7 +39,9 @@ async function resolve(id: string, hideAd: boolean): Promise<void> {
 
   try {
     await api.complaints.resolve(id, hideAd, hideAd ? hideReasonFor(id).trim() : null)
-    notice.value = hideAd ? 'Объявление скрыто, жалоба закрыта.' : 'Объявление оставлено, жалоба закрыта.'
+    notice.value = hideAd
+      ? 'Объявление скрыто, жалоба закрыта.'
+      : 'Объявление оставлено, жалоба закрыта.'
     await load()
   } catch (cause) {
     error.value = cause instanceof ApiError ? cause.message : 'Не удалось закрыть жалобу.'
@@ -52,46 +57,51 @@ onMounted(load)
 
 <template>
   <section class="page">
-    <h1>Жалобы на объявления</h1>
+    <div class="page__head">
+      <h1 class="page__title">Жалобы на объявления</h1>
+    </div>
 
-    <p v-if="loading" class="muted">Загружаем…</p>
-    <p v-if="notice" class="notice">{{ notice }}</p>
-    <p v-if="error" class="error">{{ error }}</p>
-    <p v-if="!loading && complaints.length === 0" class="muted">Открытых жалоб нет.</p>
+    <p v-if="loading" class="text-muted">Загружаем…</p>
+    <AppMessage v-if="notice" variant="success">{{ notice }}</AppMessage>
+    <AppMessage v-if="error" variant="error">{{ error }}</AppMessage>
 
-    <ul v-if="complaints.length > 0" class="list">
-      <li v-for="complaint in complaints" :key="complaint.id" class="card">
-        <div class="card__head">
-          <h2 class="card__title">{{ complaint.adTitle }}</h2>
-          <span class="muted">{{ formatDate(complaint.createdAt) }}</span>
+    <EmptyState
+      v-if="!loading && complaints.length === 0"
+      title="Открытых жалоб нет"
+      description="Жалобы пользователей на объявления появятся здесь."
+    />
+
+    <div v-if="complaints.length > 0" class="ad-list">
+      <article v-for="complaint in complaints" :key="complaint.id" class="panel stack">
+        <div class="split">
+          <h2 class="ad-row__title">{{ complaint.adTitle }}</h2>
+          <span class="text-muted">{{ formatDate(complaint.createdAt) }}</span>
         </div>
-        <p class="card__text">Жалоба от {{ complaint.authorEmail }}</p>
-        <p class="card__text">Причина: {{ complaint.reason }}</p>
+        <p>Жалоба от {{ complaint.authorEmail }}</p>
+        <p>Причина: {{ complaint.reason }}</p>
 
-        <label class="field">
-          <span class="field__label">Причина скрытия объявления</span>
-          <textarea
-            class="field__input"
-            rows="2"
-            :value="hideReasonFor(complaint.id)"
-            @input="onReasonInput(complaint.id, $event)"
-          ></textarea>
-        </label>
+        <TextAreaField
+          :model-value="hideReasonFor(complaint.id)"
+          :input-id="`hide-reason-${complaint.id}`"
+          label="Причина скрытия объявления"
+          :rows="2"
+          @update:model-value="setHideReason(complaint.id, $event)"
+        />
 
-        <div class="actions">
-          <button type="button" class="button" @click="resolve(complaint.id, false)">
+        <div class="cluster">
+          <AppButton variant="secondary" size="compact" @click="resolve(complaint.id, false)">
             Оставить объявление
-          </button>
-          <button
-            type="button"
-            class="button button--danger"
+          </AppButton>
+          <AppButton
+            variant="danger"
+            size="compact"
             :disabled="hideReasonFor(complaint.id).trim().length === 0"
             @click="resolve(complaint.id, true)"
           >
             Скрыть объявление
-          </button>
+          </AppButton>
         </div>
-      </li>
-    </ul>
+      </article>
+    </div>
   </section>
 </template>
