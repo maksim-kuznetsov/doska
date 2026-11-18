@@ -5,6 +5,7 @@ obj/
 
 # Кэши и инструменты окружения
 .tools/
+.tmp/
 
 # Интерфейс (дополнительно см. frontend/.gitignore)
 node_modules/

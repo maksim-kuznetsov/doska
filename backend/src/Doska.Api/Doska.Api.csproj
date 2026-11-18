@@ -10,6 +10,12 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="11.0.1" />
   </ItemGroup>
 
+  <!-- Пакет нужен только инструментам EF Core: стартовым проектом для команд
+       'dotnet ef migrations add' и 'database update' указан Doska.Api. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.4" PrivateAssets="all" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Doska.Infrastructure\Doska.Infrastructure.csproj" />
   </ItemGroup>
