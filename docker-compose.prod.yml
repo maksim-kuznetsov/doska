@@ -32,6 +32,7 @@ services:
       Media__RootPath: /var/www/media
     volumes:
       - media-data:/var/www/media
+      - data-protection-keys:/root/.aspnet/DataProtection-Keys
     depends_on:
       postgres:
         condition: service_healthy
@@ -52,3 +53,4 @@ services:
 volumes:
   postgres-data:
   media-data:
+  data-protection-keys:

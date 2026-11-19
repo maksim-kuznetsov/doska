@@ -1,0 +1,16 @@
+# Контекст сборки Docker: исключаем артефакты, зависимости и локальные данные.
+.git
+.gitignore
+.vs
+.idea
+**/bin
+**/obj
+**/node_modules
+frontend/dist
+.tmp
+.tools
+media
+openspec
+*.user
+.env
+.env.*
