@@ -23,10 +23,8 @@ function formatDate(value: string): string {
     </div>
 
     <div class="ad-card__body">
-      <div class="ad-card__head">
-        <h2 class="ad-card__title">{{ ad.title }}</h2>
-        <span class="ad-card__price">{{ ad.price }} ₽</span>
-      </div>
+      <span class="ad-card__price">{{ ad.price }} ₽</span>
+      <h2 class="ad-card__title">{{ ad.title }}</h2>
       <p class="ad-card__meta">
         {{ ad.sectionName }} — {{ ad.categoryName }} · {{ ad.cityName }}
       </p>

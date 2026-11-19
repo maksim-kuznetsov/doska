@@ -87,4 +87,18 @@
   --breakpoint-tablet: 1024px;
   --container-max: 74rem;
   --header-height: 4rem;
+  --category-strip-height: 2.75rem;
+
+  /* Компонентные токены (облик Avito) */
+  --card-media-aspect: 4 / 3;
+  --grid-column-min: 15rem;
+  --grid-gap: var(--space-5);
+  --price-font-size: 1.25rem;
+  --card-hover-lift: -2px;
+  --card-hover-shadow: var(--shadow-md);
+  --control-height: 2.75rem;
+  --control-height-compact: 2.125rem;
+
+  /* Отступ прилипших боковых колонок ниже шапки с полосой категорий */
+  --sticky-offset: calc(var(--header-height) + var(--category-strip-height) + var(--space-4));
 }

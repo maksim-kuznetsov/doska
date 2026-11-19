@@ -14,6 +14,9 @@ import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
 import Breadcrumbs from '../components/Breadcrumbs.vue'
 import CategoryMenu from '../components/CategoryMenu.vue'
+import CategoryStrip from '../components/CategoryStrip.vue'
+import CategoryTiles from '../components/CategoryTiles.vue'
+import CitySelect from '../components/CitySelect.vue'
 import EmptyState from '../components/EmptyState.vue'
 import FilterPanel from '../components/FilterPanel.vue'
 import FormErrors from '../components/FormErrors.vue'
@@ -27,6 +30,7 @@ import Pagination from '../components/Pagination.vue'
 import PasswordHints from '../components/PasswordHints.vue'
 import PhotoUploader from '../components/PhotoUploader.vue'
 import PriceRange from '../components/PriceRange.vue'
+import PromoBanner from '../components/PromoBanner.vue'
 import ResultsBar from '../components/ResultsBar.vue'
 import SelectField from '../components/SelectField.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -131,6 +135,28 @@ const guideErrors = [
           <span>{{ token.value }}</span>
         </div>
       </div>
+    </div>
+
+    <div class="guide__section">
+      <h2 class="guide__section-title">Компонентные токены</h2>
+      <div class="guide__row">
+        <span class="guide__note">--card-media-aspect: 4 / 3</span>
+        <span class="guide__note">--grid-column-min: 15rem</span>
+        <span class="guide__note">--grid-gap: var(--space-5)</span>
+        <span class="guide__note">--price-font-size: 1.25rem</span>
+        <span class="guide__note">--category-strip-height: 2.75rem</span>
+        <span class="guide__note">--control-height: 2.75rem</span>
+      </div>
+    </div>
+
+    <div class="guide__section">
+      <h2 class="guide__section-title">Шапка и разделы</h2>
+      <PromoBanner />
+      <div class="guide__row">
+        <CitySelect :model-value="guideFields.city" :cities="cities" />
+      </div>
+      <CategoryStrip :sections="sections" />
+      <CategoryTiles :sections="sections" />
     </div>
 
     <div class="guide__section">

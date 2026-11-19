@@ -12,6 +12,14 @@ describe('PriceRange', () => {
     expect(wrapper.findAll('input')).toHaveLength(2)
   })
 
+  it('подсказывает границы диапазона плейсхолдерами', () => {
+    const wrapper = mount(PriceRange, { props: { min: '', max: '' } })
+    const inputs = wrapper.findAll('input')
+
+    expect(inputs[0].attributes('placeholder')).toBe('от')
+    expect(inputs[1].attributes('placeholder')).toBe('до')
+  })
+
   it('сообщает об изменении границ', async () => {
     const wrapper = mount(PriceRange, { props: { min: '', max: '' } })
     const inputs = wrapper.findAll('input')

@@ -104,26 +104,31 @@ onMounted(async () => {
       </template>
     </EmptyState>
 
-    <article v-if="ad" class="stack">
-      <div class="page__head">
+    <article v-if="ad" class="ad-detail">
+      <div class="ad-detail__main stack">
         <h1 class="page__title">{{ ad.title }}</h1>
-        <span class="ad-card__price">{{ ad.price }} ₽</span>
-      </div>
 
-      <ImageGallery :photos="ad.photos" />
+        <ImageGallery :photos="ad.photos" />
 
-      <div class="panel stack">
-        <p class="ad-card__meta">
-          <template v-if="sectionName">{{ sectionName }} — </template>{{ categoryName }} ·
-          {{ cityName }}
-        </p>
-        <p>{{ ad.description }}</p>
-        <div class="stack stack--compact">
-          <p class="text-muted">Контакты</p>
-          <p>{{ ad.contacts }}</p>
+        <div class="panel stack">
+          <p class="ad-card__meta">
+            <template v-if="sectionName">{{ sectionName }} — </template>{{ categoryName }} ·
+            {{ cityName }}
+          </p>
+          <p>{{ ad.description }}</p>
+          <p class="text-muted">Опубликовано {{ publishedDate }}</p>
         </div>
-        <p class="text-muted">Опубликовано {{ publishedDate }}</p>
       </div>
+
+      <aside class="ad-detail__aside">
+        <div class="panel stack">
+          <span class="ad-card__price">{{ ad.price }} ₽</span>
+          <div class="stack stack--compact">
+            <p class="text-muted">Контакты</p>
+            <p>{{ ad.contacts }}</p>
+          </div>
+        </div>
+      </aside>
     </article>
   </section>
 </template>

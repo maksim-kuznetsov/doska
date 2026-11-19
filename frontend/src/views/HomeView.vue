@@ -18,9 +18,11 @@ import {
 } from '../api/search'
 import AdCard from '../components/AdCard.vue'
 import AppMessage from '../components/AppMessage.vue'
+import CategoryTiles from '../components/CategoryTiles.vue'
 import EmptyState from '../components/EmptyState.vue'
 import FilterPanel from '../components/FilterPanel.vue'
 import Pagination from '../components/Pagination.vue'
+import PromoBanner from '../components/PromoBanner.vue'
 import ResultsBar from '../components/ResultsBar.vue'
 
 const route = useRoute()
@@ -114,6 +116,10 @@ onMounted(async () => {
         </p>
       </div>
     </div>
+
+    <PromoBanner />
+
+    <CategoryTiles :sections="sections" />
 
     <FilterPanel
       :query="filters.query"
