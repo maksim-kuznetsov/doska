@@ -33,20 +33,23 @@ defineProps<{
         <p v-if="sections.length === 0" class="text-muted">Категорий пока нет.</p>
 
         <div v-else class="dropdown__group">
-          <div v-for="section in sections" :key="section.id">
-            <p class="dropdown__group-title">{{ section.name }}</p>
-            <ul class="dropdown__list">
-              <li v-for="subsection in section.subsections" :key="subsection.id">
-                <RouterLink
-                  class="dropdown__item"
-                  :to="{ name: 'home', query: { categoryId: subsection.id } }"
-                  @click="close"
-                >
-                  {{ subsection.name }}
-                </RouterLink>
-              </li>
-            </ul>
-          </div>
+          <template v-for="(section, index) in sections" :key="section.id">
+            <hr v-if="index > 0" class="dropdown__divider" />
+            <div>
+              <p class="dropdown__group-title">{{ section.name }}</p>
+              <ul class="dropdown__list">
+                <li v-for="subsection in section.subsections" :key="subsection.id">
+                  <RouterLink
+                    class="dropdown__item"
+                    :to="{ name: 'home', query: { categoryId: subsection.id } }"
+                    @click="close"
+                  >
+                    {{ subsection.name }}
+                  </RouterLink>
+                </li>
+              </ul>
+            </div>
+          </template>
         </div>
       </div>
     </template>

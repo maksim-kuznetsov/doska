@@ -345,12 +345,102 @@ public sealed class ClassifiedAdsApiTests : IClassFixture<ApiFactory>, IAsyncLif
         Assert.Equal(HttpStatusCode.NotFound, media.StatusCode);
     }
 
+    [Fact]
+    public async Task Public_view_shows_active_ad_and_hides_inactive()
+    {
+        await EnsureDatabaseAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        using var author = _factory.CreateClient();
+        var authorUser = await RegisterAuthorAsync(author, ct);
+        var (cityId, categoryId) = await CreateCatalogAsync();
+
+        var activeId = await CreateDbAdAsync(
+            authorUser.Id,
+            categoryId,
+            cityId,
+            $"{AdPrefix}Активное для просмотра",
+            AdStatus.Active,
+            DateTimeOffset.UtcNow);
+        var moderationId = await CreateDbAdAsync(
+            authorUser.Id,
+            categoryId,
+            cityId,
+            $"{AdPrefix}На проверке для просмотра",
+            AdStatus.OnModeration,
+            default);
+
+        using var anonymous = _factory.CreateClient();
+
+        var active = await anonymous.GetAsync($"/api/ads/{activeId}", ct);
+        Assert.Equal(HttpStatusCode.OK, active.StatusCode);
+
+        var hidden = await anonymous.GetAsync($"/api/ads/{moderationId}", ct);
+        Assert.Equal(HttpStatusCode.NotFound, hidden.StatusCode);
+
+        var ownInactive = await author.GetAsync($"/api/ads/{moderationId}", ct);
+        Assert.Equal(HttpStatusCode.OK, ownInactive.StatusCode);
+    }
+
+    [Fact]
+    public async Task Moderator_sees_non_active_ad_by_id()
+    {
+        await EnsureDatabaseAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        using var author = _factory.CreateClient();
+        var authorUser = await RegisterAuthorAsync(author, ct);
+        var (cityId, categoryId) = await CreateCatalogAsync();
+        var moderationId = await CreateDbAdAsync(
+            authorUser.Id,
+            categoryId,
+            cityId,
+            $"{AdPrefix}На проверке для модератора",
+            AdStatus.OnModeration,
+            default);
+
+        using var moderator = _factory.CreateClient();
+        await LoginModeratorAsync(moderator, ct);
+
+        var response = await moderator.GetAsync($"/api/ads/{moderationId}", ct);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
     private async Task EnsureDatabaseAsync()
     {
         if (!await TestDatabase.IsReachableAsync(_factory, TestContext.Current.CancellationToken))
         {
             Assert.Skip(TestDatabase.SkipReason);
         }
+    }
+
+    private async Task LoginModeratorAsync(HttpClient client, CancellationToken cancellationToken)
+    {
+        var email = $"ads-moderator-{Guid.NewGuid():N}@example.com";
+
+        await TestDatabase.WithServicesAsync(_factory, async provider =>
+        {
+            var db = provider.GetRequiredService<AppDbContext>();
+            var passwordHasher = provider.GetRequiredService<IPasswordHasher>();
+
+            db.Users.Add(new User
+            {
+                Email = email,
+                PasswordHash = passwordHasher.Hash(Password),
+                Role = UserRole.Moderator,
+                IsEmailConfirmed = true,
+            });
+
+            await db.SaveChangesAsync(cancellationToken);
+            return 0;
+        });
+
+        var response = await client.PostJsonAsync(
+            "/api/auth/login",
+            new { email, password = Password },
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     private async Task<UserPayload> RegisterAuthorAsync(

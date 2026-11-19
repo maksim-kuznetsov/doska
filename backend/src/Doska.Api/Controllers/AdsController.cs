@@ -87,13 +87,14 @@ public sealed class AdsController(AdService adService, AdSearchService adSearchS
         return Ok(ads.Select(AdResponse.From).ToList());
     }
 
-    /// <summary>Возвращает объявление автору или модератору.</summary>
+    /// <summary>Возвращает активное объявление любому посетителю, а иное — автору или модератору.</summary>
     [HttpGet("{id:guid}")]
+    [AllowAnonymous]
     public async Task<ActionResult<AdResponse>> GetById(Guid id, CancellationToken cancellationToken)
     {
         var ad = await adService.GetByIdAsync(
             id,
-            User.GetRequiredUserId(),
+            User.GetUserIdOrNull(),
             CanModerate,
             cancellationToken);
 

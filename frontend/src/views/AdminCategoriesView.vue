@@ -9,6 +9,7 @@ import {
 } from '../api/client'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
+import Breadcrumbs from '../components/Breadcrumbs.vue'
 import FormGrid from '../components/FormGrid.vue'
 import FormGridItem from '../components/FormGridItem.vue'
 import FormSection from '../components/FormSection.vue'
@@ -141,6 +142,8 @@ onMounted(load)
 
 <template>
   <section class="page">
+    <Breadcrumbs :items="[{ label: 'Главная', to: '/' }, { label: 'Категории' }]" />
+
     <div class="page__head">
       <h1 class="page__title">Категории</h1>
       <span class="text-muted">Управление доступно администратору</span>

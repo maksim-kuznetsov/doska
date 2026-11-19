@@ -64,6 +64,14 @@ describe('CategoryMenu', () => {
     expect(wrapper.text()).toContain('Категорий пока нет')
   })
 
+  it('разделяет группы разделов визуальными разделителями', async () => {
+    const wrapper = await mountMenu()
+
+    await wrapper.find('button[aria-label="Категории"]').trigger('click')
+
+    expect(wrapper.findAll('.dropdown__divider')).toHaveLength(sections.length - 1)
+  })
+
   it('скрывает дерево после выбора подраздела', async () => {
     const wrapper = await mountMenu()
 

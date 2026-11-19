@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { storeToRefs } from 'pinia'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -23,9 +22,7 @@ import EmptyState from '../components/EmptyState.vue'
 import FilterPanel from '../components/FilterPanel.vue'
 import Pagination from '../components/Pagination.vue'
 import ResultsBar from '../components/ResultsBar.vue'
-import { useAppStore } from '../stores/app'
 
-const { appName } = storeToRefs(useAppStore())
 const route = useRoute()
 const router = useRouter()
 
@@ -111,7 +108,7 @@ onMounted(async () => {
   <section class="page">
     <div class="page__head">
       <div class="stack stack--compact">
-        <h1 class="page__title">{{ appName }}</h1>
+        <h1 class="page__title">Объявления</h1>
         <p class="page__subtitle">
           Публичная лента активных объявлений: поиск, фильтры и сортировка.
         </p>

@@ -3,6 +3,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 import DefaultLayout from '../layouts/DefaultLayout.vue'
 import { useAuthStore } from '../stores/auth'
+import AdDetailView from '../views/AdDetailView.vue'
 import AdEditView from '../views/AdEditView.vue'
 import AdFormView from '../views/AdFormView.vue'
 import AdminCategoriesView from '../views/AdminCategoriesView.vue'
@@ -16,6 +17,7 @@ import HomeView from '../views/HomeView.vue'
 import LoginView from '../views/LoginView.vue'
 import ModerationQueueView from '../views/ModerationQueueView.vue'
 import MyAdsView from '../views/MyAdsView.vue'
+import NotFoundView from '../views/NotFoundView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import ResetPasswordView from '../views/ResetPasswordView.vue'
 
@@ -73,6 +75,11 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true },
       },
       {
+        path: 'ads/:id',
+        name: 'ad-detail',
+        component: AdDetailView,
+      },
+      {
         path: 'moderation',
         name: 'moderation',
         component: ModerationQueueView,
@@ -101,6 +108,11 @@ const routes: RouteRecordRaw[] = [
         name: 'admin-users',
         component: AdminUsersView,
         meta: { requiresAdmin: true },
+      },
+      {
+        path: ':pathMatch(.*)*',
+        name: 'not-found',
+        component: NotFoundView,
       },
     ],
   },

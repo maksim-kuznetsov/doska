@@ -19,4 +19,11 @@ public static class ClaimsPrincipalExtensions
 
         throw new ServiceException(ServiceErrorKind.Unauthorized, "Требуется вход.");
     }
+
+    /// <summary>Возвращает идентификатор текущего пользователя или <c>null</c> для анонимного запроса.</summary>
+    public static Guid? GetUserIdOrNull(this ClaimsPrincipal principal)
+    {
+        var value = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(value, out var userId) ? userId : null;
+    }
 }

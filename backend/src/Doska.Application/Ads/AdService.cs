@@ -145,10 +145,13 @@ public sealed class AdService(
         return ads.Select(ToSummary).ToList();
     }
 
-    /// <summary>Возвращает объявление автору или модератору.</summary>
+    /// <summary>
+    /// Возвращает объявление: активное — любому посетителю, любое — автору или модератору.
+    /// Недоступное объявление не раскрывается и выглядит как «не найдено».
+    /// </summary>
     public async Task<AdSummary> GetByIdAsync(
         Guid adId,
-        Guid viewerId,
+        Guid? viewerId,
         bool canModerate,
         CancellationToken cancellationToken = default)
     {
@@ -157,9 +160,13 @@ public sealed class AdService(
             .FirstOrDefaultAsync(candidate => candidate.Id == adId, cancellationToken)
             ?? throw new ServiceException(ServiceErrorKind.NotFound, "Объявление не найдено.");
 
-        if (ad.AuthorId != viewerId && !canModerate)
+        var isVisible = ad.Status == AdStatus.Active
+            || canModerate
+            || (viewerId is not null && ad.AuthorId == viewerId);
+
+        if (!isVisible)
         {
-            throw new ServiceException(ServiceErrorKind.Forbidden, "Объявление принадлежит другому автору.");
+            throw new ServiceException(ServiceErrorKind.NotFound, "Объявление не найдено.");
         }
 
         return ToSummary(ad);

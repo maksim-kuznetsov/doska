@@ -11,6 +11,7 @@ import {
 } from '../api/client'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
+import Breadcrumbs from '../components/Breadcrumbs.vue'
 import FormErrors from '../components/FormErrors.vue'
 import FormGrid from '../components/FormGrid.vue'
 import FormGridItem from '../components/FormGridItem.vue'
@@ -129,6 +130,14 @@ async function submit(): Promise<void> {
 
 <template>
   <section class="page">
+    <Breadcrumbs
+      :items="[
+        { label: 'Главная', to: '/' },
+        { label: 'Мои объявления', to: '/ads/mine' },
+        { label: 'Редактировать объявление' },
+      ]"
+    />
+
     <div class="page__head">
       <h1 class="page__title">Редактировать объявление</h1>
       <RouterLink class="btn btn--secondary btn--compact" to="/ads/mine">

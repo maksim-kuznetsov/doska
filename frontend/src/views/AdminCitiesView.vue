@@ -4,6 +4,7 @@ import { onMounted, ref } from 'vue'
 import { ApiError, api, type CityAdminView } from '../api/client'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
+import Breadcrumbs from '../components/Breadcrumbs.vue'
 import EmptyState from '../components/EmptyState.vue'
 import FormSection from '../components/FormSection.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -96,6 +97,8 @@ onMounted(load)
 
 <template>
   <section class="page">
+    <Breadcrumbs :items="[{ label: 'Главная', to: '/' }, { label: 'Города' }]" />
+
     <div class="page__head">
       <h1 class="page__title">Города</h1>
       <span class="text-muted">Управление доступно администратору</span>

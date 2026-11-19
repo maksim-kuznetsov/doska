@@ -11,7 +11,7 @@ async function login(page: import('@playwright/test').Page, email: string): Prom
 test('публичная лента показывает панель фильтров', async ({ page }) => {
   await page.goto('/')
 
-  await expect(page.getByRole('heading', { name: 'Doska' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Объявления' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Показать' })).toBeVisible()
   await expect(page.getByText(/Найдено объявлений/)).toBeVisible()
 })
@@ -44,4 +44,20 @@ test('страница-гайд доступна в Development', async ({ page 
 
   await expect(page.getByRole('heading', { name: 'Дизайн-система' })).toBeVisible()
   await expect(page.getByText('Токены палитры')).toBeVisible()
+})
+
+test('неизвестный адрес открывает заглушку внутри общего макета', async ({ page }) => {
+  await page.goto('/no-such-page')
+
+  await expect(page.getByText('Страница не найдена')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'На главную' })).toBeVisible()
+  await expect(page.locator('.site-header__brand')).toBeVisible()
+  await expect(page.locator('.site-footer__brand')).toBeVisible()
+})
+
+test('недоступное объявление показывает пустое состояние', async ({ page }) => {
+  await page.goto('/ads/00000000-0000-0000-0000-000000000000')
+
+  await expect(page.getByText('Объявление недоступно')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'На главную' })).toBeVisible()
 })

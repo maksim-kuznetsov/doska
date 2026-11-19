@@ -14,6 +14,6 @@ describe('App', () => {
       global: { plugins: [createPinia(), router] },
     })
 
-    expect(wrapper.find('h1').text()).toBe('Doska')
+    expect(wrapper.find('h1').text()).toBe('Объявления')
   })
 })

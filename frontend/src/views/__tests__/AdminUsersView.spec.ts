@@ -19,7 +19,12 @@ vi.mock('../../api/client', () => ({
   },
 }))
 
+import router from '../../router'
 import AdminUsersView from '../AdminUsersView.vue'
+
+function mountView() {
+  return mount(AdminUsersView, { global: { plugins: [router] } })
+}
 
 describe('AdminUsersView', () => {
   beforeEach(() => {
@@ -48,13 +53,15 @@ describe('AdminUsersView', () => {
       },
     ])
 
-    const wrapper = mount(AdminUsersView)
+    const wrapper = mountView()
     await flushPromises()
 
     expect(wrapper.findAll('[data-test="admin-user"]')).toHaveLength(2)
     expect(wrapper.text()).toContain('user@example.com')
     expect(wrapper.text()).toContain('blocked@example.com')
     expect(wrapper.text()).toContain('Разблокировать')
+    expect(wrapper.find('.breadcrumbs').text()).toContain('Пользователи')
+    expect(wrapper.findAll('[data-test="admin-user"]')[0].findAll('.status-badge')).toHaveLength(1)
   })
 
   it('сохраняет изменённую роль', async () => {
@@ -69,7 +76,7 @@ describe('AdminUsersView', () => {
       },
     ])
 
-    const wrapper = mount(AdminUsersView)
+    const wrapper = mountView()
     await flushPromises()
 
     await wrapper.find('select').setValue('Moderator')

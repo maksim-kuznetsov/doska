@@ -18,7 +18,12 @@ vi.mock('../../api/client', () => ({
   },
 }))
 
+import router from '../../router'
 import AdminCitiesView from '../AdminCitiesView.vue'
+
+function mountView() {
+  return mount(AdminCitiesView, { global: { plugins: [router] } })
+}
 
 describe('AdminCitiesView', () => {
   beforeEach(() => {
@@ -31,19 +36,20 @@ describe('AdminCitiesView', () => {
       { id: 'city-2', name: 'Тверь', isActive: false },
     ])
 
-    const wrapper = mount(AdminCitiesView)
+    const wrapper = mountView()
     await flushPromises()
 
     expect(wrapper.text()).toContain('Москва')
     expect(wrapper.text()).toContain('Тверь')
     expect(wrapper.text()).toContain('Доступен при подаче')
     expect(wrapper.text()).toContain('Скрыт из выбора')
+    expect(wrapper.find('.breadcrumbs').text()).toContain('Города')
   })
 
   it('сообщает о пустом справочнике', async () => {
     list.mockResolvedValue([])
 
-    const wrapper = mount(AdminCitiesView)
+    const wrapper = mountView()
     await flushPromises()
 
     expect(wrapper.text()).toContain('Городов пока нет')

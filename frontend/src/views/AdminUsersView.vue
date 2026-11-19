@@ -4,6 +4,7 @@ import { onMounted, ref } from 'vue'
 import { ApiError, api, type AdminUserView } from '../api/client'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
+import Breadcrumbs from '../components/Breadcrumbs.vue'
 import EmptyState from '../components/EmptyState.vue'
 import SelectField from '../components/SelectField.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -81,6 +82,8 @@ onMounted(load)
 
 <template>
   <section class="page">
+    <Breadcrumbs :items="[{ label: 'Главная', to: '/' }, { label: 'Пользователи' }]" />
+
     <div class="page__head">
       <h1 class="page__title">Пользователи</h1>
       <span class="text-muted">Управление доступно администратору</span>
@@ -103,7 +106,6 @@ onMounted(load)
           <h2 class="ad-row__title">{{ user.email }}</h2>
           <div class="cluster">
             <StatusBadge :status="user.isBlocked ? 'Hidden' : 'Active'" />
-            <StatusBadge :status="user.isEmailConfirmed ? 'Active' : 'OnModeration'" />
           </div>
         </div>
 
