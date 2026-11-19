@@ -18,3 +18,8 @@ backend/tests/Doska.Tests/bin/**/test-media/
 # Интерфейс (дополнительно см. frontend/.gitignore)
 node_modules/
 frontend/dist/
+
+# Playwright
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/

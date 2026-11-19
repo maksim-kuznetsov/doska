@@ -65,6 +65,17 @@ powershell -File scripts/smoke.ps1
 `-ModeratorPassword`, `-DatabaseUser`, `-DatabaseName`. Нужны запущенные API, PostgreSQL
 из `docker compose` и демо-модератор (`moderator@example.com` / `123789`).
 
+## UI-смоук (Playwright)
+
+```
+pnpm --dir frontend e2e
+```
+
+Браузерный смоук проверяет публичную ленту и фильтры, вход модератора (очередь и жалобы),
+вход администратора (категории, города, пользователи) и страницу-гайд. Нужны запущенные API,
+PostgreSQL и демо-данные (`dotnet run --project backend/src/Doska.Api -- seed`); dev-сервер Vite
+Playwright поднимает сам. Тест не изменяет данные.
+
 ## Очистка медиа
 
 ```
