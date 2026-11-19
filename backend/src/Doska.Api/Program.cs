@@ -17,6 +17,7 @@ using Doska.Infrastructure.Security;
 using Doska.Infrastructure.Seed;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -41,6 +42,17 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddSingleton(TimeProvider.System);
 
+// В Development ключи Data Protection сохраняются на диске, чтобы сессии
+// и antiforgery-токены переживали перезапуск API.
+if (builder.Environment.IsDevelopment())
+{
+    var keyRingPath = Path.Combine(builder.Environment.ContentRootPath, "media", "keys");
+    Directory.CreateDirectory(keyRingPath);
+    builder.Services
+        .AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(keyRingPath));
+}
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options
         .UseNpgsql(builder.Configuration.GetConnectionString("Default"))
@@ -52,6 +64,7 @@ builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
 builder.Services.Configure<MediaOptions>(builder.Configuration.GetSection(MediaOptions.SectionName));
 builder.Services.AddScoped<IAdPhotoStorage, LocalAdPhotoStorage>();
+builder.Services.AddScoped<IMediaMaintenance, MediaMaintenanceService>();
 builder.Services.AddHostedService<AdArchiveBackgroundService>();
 
 // Режим отправки писем: журнал, файловый ящик или SMTP. При пустом Mode он
@@ -213,6 +226,23 @@ await ApplyMigrationsAsync(app);
 if (args.Contains("seed", StringComparer.OrdinalIgnoreCase))
 {
     await SeedDemoDataAsync(app);
+    return;
+}
+
+if (args.Contains("cleanup-media", StringComparer.OrdinalIgnoreCase))
+{
+    using var scope = app.Services.CreateScope();
+    var maintenance = scope.ServiceProvider.GetRequiredService<IMediaMaintenance>();
+    var result = await maintenance.CleanupAsync();
+    var logger = scope.ServiceProvider
+        .GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Doska.Maintenance");
+
+    logger.LogInformation(
+        "Очистка медиа: удалено каталогов — {Directories}, файлов — {Files}.",
+        result.RemovedDirectories,
+        result.RemovedFiles);
+
     return;
 }
 

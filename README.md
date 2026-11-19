@@ -51,6 +51,29 @@
 - Бэкенд: `dotnet test backend/Doska.sln`.
 - Интерфейс: `pnpm --dir frontend test`.
 
+## Сквозной смоук
+
+`scripts/smoke.ps1` проходит живой стенд целиком: регистрация → подтверждение email через psql →
+подача объявления с фото → очередь модерации → одобрение → лента → «Продано» → удаление.
+Скрипт создаёт временного пользователя и убирает его и объявление в конце.
+
+```
+powershell -File scripts/smoke.ps1
+```
+
+Параметры: `-BaseUrl` (по умолчанию `http://localhost:5000`), `-ModeratorEmail`,
+`-ModeratorPassword`, `-DatabaseUser`, `-DatabaseName`. Нужны запущенные API, PostgreSQL
+из `docker compose` и демо-модератор (`moderator@example.com` / `123789`).
+
+## Очистка медиа
+
+```
+dotnet run --project backend/src/Doska.Api -- cleanup-media
+```
+
+Удаляет каталоги `media/photos/<adId>`, для которых нет объявления, и файлы, не привязанные
+к `ad_photos`. Команда идемпотентна: повторный запуск ничего не меняет.
+
 ## Непрерывная интеграция
 
 Workflow `.github/workflows/ci.yml` запускается на push в `master`, на pull request и вручную
