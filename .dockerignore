@@ -9,7 +9,8 @@
 frontend/dist
 .tmp
 .tools
-media
+/media
+backend/src/Doska.Api/media
 openspec
 *.user
 .env

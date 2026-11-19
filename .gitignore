@@ -7,8 +7,8 @@ obj/
 .tools/
 .tmp/
 
-# Локальное хранилище медиафайлов
-media/
+# Локальное хранилище медиафайлов (не путать с исходниками Doska.Infrastructure/Media)
+/media/
 backend/src/Doska.Api/media/
 backend/tests/Doska.Tests/bin/**/test-media/
 
