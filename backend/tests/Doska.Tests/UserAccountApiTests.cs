@@ -200,6 +200,75 @@ public sealed class UserAccountApiTests : IClassFixture<ApiFactory>, IAsyncLifet
             (await moderator.PutJsonAsync($"/api/admin/users/{target.Id}/role", new { role = "Admin" }, ct)).StatusCode);
     }
 
+    [Fact]
+    public async Task Role_change_applies_to_active_session_without_relogin()
+    {
+        await EnsureDatabaseAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        using var admin = _factory.CreateClient();
+        await LoginAsync(admin, await CreateStaffAsync(UserRole.Admin, ct), ct);
+
+        using var user = _factory.CreateClient();
+        var email = await RegisterAsync(user, ct);
+
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await user.GetAsync("/api/admin/categories", ct)).StatusCode);
+
+        var target = await FindUserAsync(admin, email, ct);
+
+        var promote = await admin.PutJsonAsync(
+            $"/api/admin/users/{target.Id}/role",
+            new { role = "Admin" },
+            ct);
+        Assert.Equal(HttpStatusCode.OK, promote.StatusCode);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await user.GetAsync("/api/admin/categories", ct)).StatusCode);
+
+        var demote = await admin.PutJsonAsync(
+            $"/api/admin/users/{target.Id}/role",
+            new { role = "User" },
+            ct);
+        Assert.Equal(HttpStatusCode.OK, demote.StatusCode);
+
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await user.GetAsync("/api/admin/categories", ct)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Blocked_user_loses_active_session()
+    {
+        await EnsureDatabaseAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        using var admin = _factory.CreateClient();
+        await LoginAsync(admin, await CreateStaffAsync(UserRole.Admin, ct), ct);
+
+        using var user = _factory.CreateClient();
+        var email = await RegisterAsync(user, ct);
+
+        Assert.Equal(HttpStatusCode.OK, (await user.GetAsync("/api/ads/mine", ct)).StatusCode);
+
+        var target = await FindUserAsync(admin, email, ct);
+        var blocked = await admin.PostJsonAsync($"/api/users/{target.Id}/block", null, ct);
+        Assert.Equal(HttpStatusCode.OK, blocked.StatusCode);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await user.GetAsync("/api/ads/mine", ct)).StatusCode);
+    }
+
+    private async Task<AdminUserPayload> FindUserAsync(
+        HttpClient admin,
+        string email,
+        CancellationToken cancellationToken)
+    {
+        var users = await admin.GetFromJsonAsync<List<AdminUserPayload>>("/api/admin/users", cancellationToken);
+        return Assert.Single(users!, user => user.Email == email);
+    }
+
     private async Task EnsureDatabaseAsync()
     {
         if (!await TestDatabase.IsReachableAsync(_factory, TestContext.Current.CancellationToken))

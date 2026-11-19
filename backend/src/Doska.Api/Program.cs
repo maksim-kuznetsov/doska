@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Doska.Api.Background;
 using Doska.Api.Infrastructure;
@@ -14,6 +15,7 @@ using Doska.Infrastructure.Media;
 using Doska.Infrastructure.Persistence;
 using Doska.Infrastructure.Security;
 using Doska.Infrastructure.Seed;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
@@ -83,6 +85,41 @@ builder.Services
         options.SlidingExpiration = true;
         options.Events = new CookieAuthenticationEvents
         {
+            // Роль в cookie фиксируется при входе, поэтому на каждом запросе берём
+            // актуальные данные пользователя: смена роли и блокировка действуют сразу.
+            OnValidatePrincipal = async context =>
+            {
+                var db = context.HttpContext.RequestServices.GetRequiredService<IAppDbContext>();
+                var userIdValue = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (!Guid.TryParse(userIdValue, out var userId))
+                {
+                    await RejectSessionAsync(context);
+                    return;
+                }
+
+                var user = await db.Users
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        candidate => candidate.Id == userId,
+                        context.HttpContext.RequestAborted);
+
+                if (user is null || user.IsBlocked)
+                {
+                    await RejectSessionAsync(context);
+                    return;
+                }
+
+                var claims = new List<Claim>
+                {
+                    new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                    new(ClaimTypes.Email, user.Email),
+                    new(ClaimTypes.Role, user.Role.ToString()),
+                };
+
+                context.ReplacePrincipal(new ClaimsPrincipal(
+                    new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme)));
+            },
             OnRedirectToLogin = context =>
             {
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -160,6 +197,12 @@ if (args.Contains("seed", StringComparer.OrdinalIgnoreCase))
 app.MapControllers();
 
 app.Run();
+
+static async Task RejectSessionAsync(CookieValidatePrincipalContext context)
+{
+    context.RejectPrincipal();
+    await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+}
 
 static async Task ApplyMigrationsAsync(WebApplication app)
 {
