@@ -1,5 +1,6 @@
 # Локальная инфраструктура разработки.
-# Один сервис: PostgreSQL для бэкенда. API и интерфейс запускаются на хосте (см. README).
+# PostgreSQL для бэкенда и локальный SMTP-сервер Mailpit для проверки писем.
+# API и интерфейс запускаются на хосте (см. README).
 #
 # Порт 5432 на хосте занят старым стеком проекта doska, поэтому контейнер публикуется
 # на 5433; строка подключения в backend/src/Doska.Api/appsettings.Development.json
@@ -22,6 +23,15 @@ services:
       timeout: 5s
       retries: 10
       start_period: 5s
+
+  # Локальный SMTP без авторизации: приём на 1025, веб-инбокс на 8025.
+  # Включается, когда API запущено с Email:Mode=Smtp (см. README).
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    restart: unless-stopped
 
 volumes:
   postgres-data:

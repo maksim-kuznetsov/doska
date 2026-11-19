@@ -114,6 +114,41 @@ PostgreSQL, API и веб-сервер nginx, который отдаёт соб
 - Медиафайлы хранятся в томе `media-data`; в `Production` их отдаёт nginx по внутреннему
   перенаправлению приложения, в `Development` — само приложение.
 
+## Письма локально
+
+Письма (подтверждение email, сброс пароля, решения модерации, напоминание о сроке) в Development
+по умолчанию сохраняются как файлы `.eml` в `backend/src/Doska.Api/media/outbox/`. Откройте файл
+почтовым клиентом или текстовым редактором — внутри ссылка подтверждения/сброса или причина решения.
+
+Режим задаётся настройкой `Email:Mode`:
+
+- `File` — файлы в `Email:OutboxPath` (по умолчанию `media/outbox`); режим Development по умолчанию.
+- `Log` — письма пишутся в журнал API.
+- `Smtp` — реальная отправка; требует `Email:Host`, иначе приложение не стартует.
+
+### Локальный SMTP с веб-инбоксом (Mailpit)
+
+Без реальных креденшелов письма удобно смотреть в Mailpit:
+
+```
+docker compose up -d mailpit
+```
+
+Затем запустите API с переключением на SMTP (веб-инбокс — http://localhost:8025):
+
+```
+$env:Email__Mode="Smtp"
+$env:Email__Host="localhost"
+$env:Email__Port="1025"
+$env:Email__UseStartTls="false"
+dotnet run --project backend/src/Doska.Api
+```
+
+### Реальный SMTP
+
+Когда появятся креды, задайте `Email__Mode=Smtp`, `Email__Host`, `Email__Port`, `Email__UserName`,
+`Email__Password`, `Email__From` (в `.env` при развёртывании). Код и тесты при этом не меняются.
+
 ## Откат релиза
 
 1. Верните предыдущую ревизию кода:

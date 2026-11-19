@@ -53,13 +53,35 @@ builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailO
 builder.Services.Configure<MediaOptions>(builder.Configuration.GetSection(MediaOptions.SectionName));
 builder.Services.AddScoped<IAdPhotoStorage, LocalAdPhotoStorage>();
 builder.Services.AddHostedService<AdArchiveBackgroundService>();
-if (string.IsNullOrWhiteSpace(builder.Configuration[$"{EmailOptions.SectionName}:Host"]))
+
+// Режим отправки писем: журнал, файловый ящик или SMTP. При пустом Mode он
+// выводится из наличия Email:Host — так сохраняется прежнее поведение.
+var emailHost = builder.Configuration[$"{EmailOptions.SectionName}:Host"];
+var emailMode = builder.Configuration[$"{EmailOptions.SectionName}:Mode"];
+if (string.IsNullOrWhiteSpace(emailMode))
 {
-    builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
+    emailMode = string.IsNullOrWhiteSpace(emailHost) ? EmailModes.Log : EmailModes.Smtp;
 }
-else
+
+switch (emailMode.Trim().ToLowerInvariant())
 {
-    builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+    case "smtp":
+        if (string.IsNullOrWhiteSpace(emailHost))
+        {
+            throw new InvalidOperationException(
+                "Email:Host обязателен при Email:Mode=Smtp.");
+        }
+
+        builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+        break;
+
+    case "file":
+        builder.Services.AddScoped<IEmailSender, FileEmailSender>();
+        break;
+
+    default:
+        builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
+        break;
 }
 
 builder.Services.AddScoped<AuthService>();
