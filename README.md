@@ -51,6 +51,31 @@
 - Бэкенд: `dotnet test backend/Doska.sln`.
 - Интерфейс: `pnpm --dir frontend test`.
 
+## Непрерывная интеграция
+
+Workflow `.github/workflows/ci.yml` запускается на push в `master`, на pull request и вручную
+и выполняет три джобы:
+
+- **Backend** — поднимает PostgreSQL 17 на порту 5433, собирает решение, проверяет, что модель
+  EF Core не разошлась с миграциями (`dotnet ef migrations has-pending-model-changes`), применяет
+  миграции к чистой базе и запускает `dotnet test`.
+- **Frontend** — устанавливает зависимости по lockfile, запускает `pnpm test` и `pnpm build`.
+- **Production images** — после зелёных тестов проверяет `docker-compose.prod.yml` и собирает
+  production-образы API и веб-сервера.
+
+Локальное воспроизведение проверок:
+
+```
+docker compose up -d postgres
+dotnet build backend/Doska.sln
+dotnet test backend/Doska.sln
+pnpm --dir frontend test
+pnpm --dir frontend build
+```
+
+Если в вашем окружении `dotnet test` не работает из-за ограничений среды, тесты можно запустить
+напрямую: `backend/tests/Doska.Tests/bin/Debug/net10.0/Doska.Tests.exe`.
+
 ## Остановка
 
 - `docker compose down` — остановить контейнеры, данные остаются в томе `postgres-data`.
