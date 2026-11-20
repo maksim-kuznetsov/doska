@@ -3,6 +3,7 @@ import { ref } from 'vue'
 
 import type {
   AdCard as AdCardModel,
+  AdPhotoSummary,
   AdSummary,
   ModerationQueueItem,
   SectionOption,
@@ -96,6 +97,28 @@ const adSummary: AdSummary = {
   publishedAt: null,
   photos: [],
 }
+
+function placeholderPhoto(order: number): AdPhotoSummary {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="#e6f7ff"/><text x="400" y="300" font-size="48" text-anchor="middle" fill="#0077cc">${order}</text></svg>`
+  const url = `data:image/svg+xml,${encodeURIComponent(svg)}`
+
+  return {
+    id: `guide-photo-${order}`,
+    url,
+    thumbnailUrl: url,
+    contentType: 'image/svg+xml',
+    byteSize: 0,
+    width: 800,
+    height: 600,
+    sortOrder: order,
+  }
+}
+
+const galleryPhotos: AdPhotoSummary[] = [
+  placeholderPhoto(1),
+  placeholderPhoto(2),
+  placeholderPhoto(3),
+]
 
 const queue: ModerationQueueItem[] = [
   {
@@ -232,7 +255,7 @@ const guideErrors = [
           <AppButton variant="danger" size="compact">Удалить</AppButton>
         </template>
       </AdRow>
-      <ImageGallery :photos="[]" />
+      <ImageGallery :photos="galleryPhotos" />
       <div class="guide__row">
         <StatusBadge status="OnModeration" />
         <StatusBadge status="Active" />

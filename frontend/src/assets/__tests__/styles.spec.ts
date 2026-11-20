@@ -35,3 +35,17 @@ describe('Сетка карточек ленты', () => {
     expect(media).toContain('aspect-ratio: var(--card-media-aspect)')
   })
 })
+
+describe('Окно просмотра фотографий', () => {
+  it('вписывает полноразмерное изображение в окно', () => {
+    const image = ruleBody(css, '.photo-viewer__image')
+
+    expect(image).toContain('max-width: 100%')
+    expect(image).toContain('max-height: 70vh')
+    expect(image).toContain('object-fit: contain')
+  })
+
+  it('затемняет фон за окном', () => {
+    expect(ruleBody(css, '.photo-viewer::backdrop')).toContain('background: var(--color-overlay)')
+  })
+})

@@ -26,6 +26,32 @@ vi.mock('../../api/client', () => ({
 import { ApiError } from '../../api/client'
 import AdDetailView from '../AdDetailView.vue'
 
+const activeAd = {
+  id: 'ad-1',
+  title: 'Велосипед',
+  description: 'Аккуратный городской велосипед.',
+  price: 25000,
+  cityId: 'city-1',
+  categoryId: 'sub-1',
+  contacts: '+7 900 000-00-00',
+  status: 'Active',
+  moderationReason: null,
+  createdAt: '2026-11-19T00:00:00Z',
+  publishedAt: '2026-11-19T00:00:00Z',
+  photos: [
+    {
+      id: 'photo-1',
+      url: '/api/media/ad-1/one.png',
+      thumbnailUrl: '/api/media/ad-1/one_thumb.jpg',
+      contentType: 'image/png',
+      byteSize: 128,
+      width: 8,
+      height: 8,
+      sortOrder: 1,
+    },
+  ],
+}
+
 async function mountView() {
   const router = createRouter({
     history: createMemoryHistory(),
@@ -54,31 +80,7 @@ describe('AdDetailView', () => {
   })
 
   it('показывает данные активного объявления и галерею', async () => {
-    get.mockResolvedValue({
-      id: 'ad-1',
-      title: 'Велосипед',
-      description: 'Аккуратный городской велосипед.',
-      price: 25000,
-      cityId: 'city-1',
-      categoryId: 'sub-1',
-      contacts: '+7 900 000-00-00',
-      status: 'Active',
-      moderationReason: null,
-      createdAt: '2026-11-19T00:00:00Z',
-      publishedAt: '2026-11-19T00:00:00Z',
-      photos: [
-        {
-          id: 'photo-1',
-          url: '/api/media/ad-1/one.png',
-          thumbnailUrl: '/api/media/ad-1/one_thumb.jpg',
-          contentType: 'image/png',
-          byteSize: 128,
-          width: 8,
-          height: 8,
-          sortOrder: 1,
-        },
-      ],
-    })
+    get.mockResolvedValue(activeAd)
 
     const wrapper = await mountView()
     await flushPromises()
@@ -97,5 +99,17 @@ describe('AdDetailView', () => {
     await flushPromises()
 
     expect(wrapper.find('.empty-state').text()).toContain('Объявление недоступно')
+  })
+
+  it('открывает окно просмотра по клику на фотографию', async () => {
+    get.mockResolvedValue(activeAd)
+
+    const wrapper = await mountView()
+    await flushPromises()
+
+    await wrapper.find('.gallery__button').trigger('click')
+
+    expect(wrapper.find('.photo-viewer').exists()).toBe(true)
+    expect(wrapper.find('.photo-viewer__image').attributes('src')).toBe('/api/media/ad-1/one.png')
   })
 })

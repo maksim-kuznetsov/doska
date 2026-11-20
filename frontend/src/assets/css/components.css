@@ -1067,12 +1067,136 @@
   list-style: none;
 }
 
+.gallery__button {
+  display: block;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
+}
+
 .gallery__image {
   width: 9rem;
   height: 7rem;
   object-fit: cover;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+}
+
+/* Окно просмотра фотографий */
+.photo-viewer {
+  position: relative;
+  width: min(90vw, 64rem);
+  max-width: none;
+  max-height: 90vh;
+  padding: var(--space-4);
+  border: none;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.photo-viewer::backdrop {
+  background: var(--color-overlay);
+}
+
+.photo-viewer__stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-height: 70vh;
+}
+
+.photo-viewer__image {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+}
+
+.photo-viewer__nav {
+  position: absolute;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  font-size: var(--font-size-xl);
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+.photo-viewer__nav--prev {
+  left: var(--space-3);
+}
+
+.photo-viewer__nav--next {
+  right: var(--space-3);
+}
+
+.photo-viewer__close {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-height-compact);
+  height: var(--control-height-compact);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-muted);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+}
+
+.photo-viewer__footer {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.photo-viewer__counter {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+.photo-viewer__thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.photo-viewer__thumb {
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  line-height: 0;
+}
+
+.photo-viewer__thumb--active {
+  border-color: var(--color-primary);
+}
+
+.photo-viewer__thumb img {
+  width: 4rem;
+  height: 3rem;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
 }
 
 /* Карточка модерации */
