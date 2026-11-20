@@ -15,6 +15,9 @@ backend/tests/Doska.Tests/bin/**/test-media/
 # Производственные секреты
 .env
 
+# Временный файловый ящик писем production (bind-mount docker-compose.prod.yml)
+/outbox/
+
 # Интерфейс (дополнительно см. frontend/.gitignore)
 node_modules/
 frontend/dist/

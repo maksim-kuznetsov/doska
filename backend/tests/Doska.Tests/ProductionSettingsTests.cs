@@ -44,7 +44,7 @@ public sealed class ProductionSettingsTests
     }
 
     [Fact]
-    public void Production_requires_smtp()
+    public void Production_rejects_log_mode()
     {
         var configuration = BuildConfiguration(
             ("App:PublicBaseUrl", "https://doska.example.com"),
@@ -53,7 +53,46 @@ public sealed class ProductionSettingsTests
         var exception = Assert.Throws<InvalidOperationException>(
             () => ProductionSettings.Validate(configuration, new TestEnvironment("Production"), "Log"));
 
-        Assert.Contains("SMTP", exception.Message);
+        Assert.Contains("Smtp", exception.Message);
+        Assert.Contains("File", exception.Message);
+    }
+
+    [Fact]
+    public void Production_allows_file_mode_with_absolute_outbox()
+    {
+        var configuration = BuildConfiguration(
+            ("App:PublicBaseUrl", "https://doska.example.com"),
+            ("Email:Mode", "File"),
+            ("Email:OutboxPath", "/srv/doska/outbox"));
+
+        ProductionSettings.Validate(configuration, new TestEnvironment("Production"), "File");
+    }
+
+    [Fact]
+    public void Production_rejects_file_mode_without_outbox()
+    {
+        var configuration = BuildConfiguration(
+            ("App:PublicBaseUrl", "https://doska.example.com"),
+            ("Email:Mode", "File"));
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => ProductionSettings.Validate(configuration, new TestEnvironment("Production"), "File"));
+
+        Assert.Contains("Email:OutboxPath", exception.Message);
+    }
+
+    [Fact]
+    public void Production_rejects_file_mode_with_relative_outbox()
+    {
+        var configuration = BuildConfiguration(
+            ("App:PublicBaseUrl", "https://doska.example.com"),
+            ("Email:Mode", "File"),
+            ("Email:OutboxPath", "media/outbox"));
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => ProductionSettings.Validate(configuration, new TestEnvironment("Production"), "File"));
+
+        Assert.Contains("абсолютный", exception.Message);
     }
 
     [Fact]

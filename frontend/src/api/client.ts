@@ -153,6 +153,19 @@ export interface AdminUserView {
   isEmailConfirmed: boolean
 }
 
+export interface OutboxMessageView {
+  fileName: string
+  size: number
+  modifiedAt: string
+  recipient: string
+  subject: string
+  sentAt: string | null
+}
+
+export interface OutboxMessageContent {
+  content: string
+}
+
 /** Ошибка API с HTTP-кодом и сообщением из `ProblemDetails`. */
 export class ApiError extends Error {
   readonly status: number
@@ -349,5 +362,10 @@ export const api = {
         method: 'POST',
       }),
     remove: (id: string) => request<void>(`/admin/cities/${id}`, { method: 'DELETE' }),
+  },
+  adminOutbox: {
+    list: () => request<OutboxMessageView[]>('/admin/outbox'),
+    read: (fileName: string) =>
+      request<OutboxMessageContent>(`/admin/outbox/${encodeURIComponent(fileName)}`),
   },
 }

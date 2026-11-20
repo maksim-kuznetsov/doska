@@ -14,6 +14,12 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     /// <summary>Сборщик отправленных писем: подменяет настоящую отправку.</summary>
     public CapturingEmailSender Emails { get; } = new();
 
+    /// <summary>Каталог файлового ящика писем для тестов (свой у каждой фабрики).</summary>
+    public string OutboxPath { get; } = Path.Combine(
+        AppContext.BaseDirectory,
+        "test-outbox",
+        Guid.NewGuid().ToString("N"));
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
@@ -29,6 +35,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         builder.UseSetting(
             "Media:RootPath",
             Path.Combine(AppContext.BaseDirectory, "test-media"));
+
+        // Файловый ящик писем — тоже в каталог сборки тестов.
+        builder.UseSetting("Email:OutboxPath", OutboxPath);
 
         // Абсолютный адрес сайта: письма должны содержать рабочие ссылки.
         builder.UseSetting("App:PublicBaseUrl", "https://doska.example.com");

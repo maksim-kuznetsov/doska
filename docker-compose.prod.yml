@@ -32,14 +32,16 @@ services:
       Media__RootPath: /var/www/media
       App__PublicBaseUrl: ${App__PublicBaseUrl:?задайте App__PublicBaseUrl в .env}
       Email__Mode: ${Email__Mode:-Smtp}
-      Email__Host: ${Email__Host:?задайте Email__Host в .env}
+      Email__Host: ${Email__Host:-}
       Email__Port: ${Email__Port:-587}
       Email__UserName: ${Email__UserName:-}
       Email__Password: ${Email__Password:-}
       Email__From: ${Email__From:-no-reply@doska.local}
       Email__UseStartTls: ${Email__UseStartTls:-true}
+      Email__OutboxPath: ${Email__OutboxPath:-/srv/doska/outbox}
     volumes:
       - media-data:/var/www/media
+      - ./outbox:/srv/doska/outbox
       - data-protection-keys:/root/.aspnet/DataProtection-Keys
     depends_on:
       postgres:

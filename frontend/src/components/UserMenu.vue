@@ -52,6 +52,9 @@ const emit = defineEmits<{ (event: 'logout'): void }>()
           <RouterLink v-if="isAdmin" class="dropdown__item" to="/admin/users" @click="close">
             Пользователи
           </RouterLink>
+          <RouterLink v-if="isAdmin" class="dropdown__item" to="/admin/outbox" @click="close">
+            Письма (outbox)
+          </RouterLink>
         </div>
       </template>
 

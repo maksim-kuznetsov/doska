@@ -116,6 +116,9 @@ switch (emailMode.Trim().ToLowerInvariant())
         break;
 }
 
+// Чтение файлового ящика доступно независимо от режима отправки: вне File каталог пуст.
+builder.Services.AddScoped<IEmailOutbox, FileEmailOutbox>();
+
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AdService>();

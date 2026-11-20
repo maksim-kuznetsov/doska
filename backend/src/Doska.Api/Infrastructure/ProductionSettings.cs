@@ -32,11 +32,26 @@ public static class ProductionSettings
                 $"например https://doska.example.com. Текущее значение: {publicBaseUrl}.");
         }
 
+        // Временный режим File допускается в Production, но только с абсолютным каталогом:
+        // относительный путь зависит от каталога приложения и не совпадёт с точкой монтирования.
+        if (string.Equals(emailMode, EmailModes.File, StringComparison.OrdinalIgnoreCase))
+        {
+            var outboxPath = configuration["Email:OutboxPath"];
+            if (string.IsNullOrWhiteSpace(outboxPath) || !Path.IsPathRooted(outboxPath))
+            {
+                throw new InvalidOperationException(
+                    "В Production в режиме Email:Mode=File задайте абсолютный Email:OutboxPath, " +
+                    "например /srv/doska/outbox.");
+            }
+
+            return;
+        }
+
         if (!string.Equals(emailMode, EmailModes.Smtp, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "В Production письма отправляются через SMTP: задайте Email:Mode=Smtp " +
-                "и параметры Email:Host, Email:Port, Email:From.");
+                "В Production допустимы Email:Mode=Smtp (штатный) или Email:Mode=File (временный): " +
+                "задайте Email:Mode=Smtp и параметры Email:Host, Email:Port, Email:From.");
         }
 
         if (string.IsNullOrWhiteSpace(configuration["Email:Host"]))

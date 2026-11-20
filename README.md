@@ -202,6 +202,14 @@ dotnet run --project backend/src/Doska.Api
 Когда появятся креды, задайте `Email__Mode=Smtp`, `Email__Host`, `Email__Port`, `Email__UserName`,
 `Email__Password`, `Email__From` (в `.env` при развёртывании). Код и тесты при этом не меняются.
 
+### Временный режим File в production
+
+Пока SMTP не настроен, на боевом стенде можно временно включить `Email__Mode=File`: письма
+сохраняются в `Email__OutboxPath` (bind-mount `./outbox` → `/srv/doska/outbox`), а администратор
+читает их в разделе «Письма (outbox)» и вручную передаёт ссылку подтверждения или причину решения.
+Как только появятся SMTP-креды, верните `Email__Mode=Smtp`. Подробности и очистка каталога — в
+`deploy/DEPLOY.md`, раздел «Почта в production».
+
 ## Откат релиза
 
 Порядок описан в [`deploy/DEPLOY.md`](deploy/DEPLOY.md), «Инструкция 2», раздел «Откат релиза»:
