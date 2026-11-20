@@ -7,6 +7,7 @@ using Doska.Application.Accounts;
 using Doska.Application.Ads;
 using Doska.Application.Auth;
 using Doska.Application.Categories;
+using Doska.Application.Common;
 using Doska.Application.Locations;
 using Doska.Application.Moderation;
 using Doska.Domain.Enums;
@@ -19,6 +20,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -42,6 +44,19 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddSingleton(TimeProvider.System);
 
+// В production перед API стоят Caddy и nginx: доверяем заголовкам прокси,
+// чтобы запрос считался https, а ограничение частоты видело адрес клиента.
+// API не публикует порт наружу, поэтому доверять можно всей внутренней сети.
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.KnownIPNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
+}
+
 // В Development ключи Data Protection сохраняются на диске, чтобы сессии
 // и antiforgery-токены переживали перезапуск API.
 if (builder.Environment.IsDevelopment())
@@ -62,7 +77,9 @@ builder.Services.AddScoped<IAppDbContext>(provider => provider.GetRequiredServic
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.Configure<PublicUrlOptions>(builder.Configuration.GetSection(PublicUrlOptions.SectionName));
 builder.Services.Configure<MediaOptions>(builder.Configuration.GetSection(MediaOptions.SectionName));
+builder.Services.AddSingleton<IPublicUrlProvider, ConfiguredPublicUrlProvider>();
 builder.Services.AddScoped<IAdPhotoStorage, LocalAdPhotoStorage>();
 builder.Services.AddScoped<IMediaMaintenance, MediaMaintenanceService>();
 builder.Services.AddHostedService<AdArchiveBackgroundService>();
@@ -75,6 +92,8 @@ if (string.IsNullOrWhiteSpace(emailMode))
 {
     emailMode = string.IsNullOrWhiteSpace(emailHost) ? EmailModes.Log : EmailModes.Smtp;
 }
+
+ProductionSettings.Validate(builder.Configuration, builder.Environment, emailMode);
 
 switch (emailMode.Trim().ToLowerInvariant())
 {
@@ -207,6 +226,11 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+if (!app.Environment.IsDevelopment())
+{
+    app.UseForwardedHeaders();
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -222,6 +246,18 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 await ApplyMigrationsAsync(app);
+
+if (args.Contains("init-data", StringComparer.OrdinalIgnoreCase))
+{
+    await InitReferenceDataAsync(app);
+    return;
+}
+
+if (args.Contains("create-admin", StringComparer.OrdinalIgnoreCase))
+{
+    Environment.ExitCode = await CreateAdminAsync(app);
+    return;
+}
 
 if (args.Contains("seed", StringComparer.OrdinalIgnoreCase))
 {
@@ -282,6 +318,64 @@ static async Task ApplyMigrationsAsync(WebApplication app)
     }
 
     logger.LogInformation("Миграции базы данных применены.");
+}
+
+static async Task InitReferenceDataAsync(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    var logger = scope.ServiceProvider
+        .GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Doska.InitData");
+    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+    await ReferenceDataSeeder.SeedAsync(context);
+    logger.LogInformation("Справочники городов и категорий созданы.");
+}
+
+static async Task<int> CreateAdminAsync(WebApplication app)
+{
+    var logger = app.Services
+        .GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Doska.CreateAdmin");
+
+    var email = app.Configuration["Admin:Email"]?.Trim();
+    var password = app.Configuration["Admin:Password"];
+
+    if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
+    {
+        logger.LogError("Укажите корректный email в переменной Admin__Email.");
+        return 1;
+    }
+
+    if (string.IsNullOrWhiteSpace(password))
+    {
+        logger.LogError("Укажите пароль в переменной Admin__Password.");
+        return 1;
+    }
+
+    try
+    {
+        AuthService.ValidatePassword(password);
+    }
+    catch (ServiceException exception)
+    {
+        logger.LogError("{Message}", exception.Message);
+        return 1;
+    }
+
+    using var scope = app.Services.CreateScope();
+    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+
+    var created = await AdminSeeder.CreateOrUpdateAsync(context, passwordHasher, email, password);
+
+    logger.LogInformation(
+        created
+            ? "Администратор {Email} создан."
+            : "Пользователь {Email} назначен администратором, пароль обновлён.",
+        email);
+
+    return 0;
 }
 
 static async Task SeedDemoDataAsync(WebApplication app)

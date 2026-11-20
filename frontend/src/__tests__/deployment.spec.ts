@@ -21,6 +21,20 @@ describe('Конфигурация развёртывания', () => {
     expect(compose).toContain('ConnectionStrings__Default')
   })
 
+  it('описывает HTTPS через Caddy и не публикует порт веб-сервера', () => {
+    const compose = read('docker-compose.prod.yml')
+    const webBlock = / {2}web:\n([\s\S]*?)\n {2}caddy:/.exec(compose)?.[1] ?? ''
+
+    expect(compose).toContain('caddy:')
+    expect(compose).toContain('caddy:2-alpine')
+    expect(compose).toContain('${DOMAIN:?')
+    expect(compose).toContain('${ACME_EMAIL:?')
+    expect(compose).toContain('./deploy/Caddyfile')
+    expect(webBlock).toContain('expose:')
+    expect(webBlock).not.toMatch(/^ {4}ports:/m)
+    expect(read('deploy/Caddyfile')).toContain('reverse_proxy web:80')
+  })
+
   it('веб-сервер проксирует API и отдаёт медиа внутренним путём', () => {
     const nginx = read('deploy/nginx.conf')
 
@@ -40,6 +54,7 @@ describe('Конфигурация развёртывания', () => {
   })
 
   it('описывает откат релиза в документации', () => {
-    expect(read('README.md')).toContain('Откат релиза')
+    expect(read('deploy/DEPLOY.md')).toContain('Откат релиза')
+    expect(read('README.md')).toContain('deploy/DEPLOY.md')
   })
 })

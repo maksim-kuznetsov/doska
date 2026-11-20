@@ -21,7 +21,12 @@ public sealed record AuthenticatedUser(
 }
 
 /// <summary>Регистрация, вход и подтверждение email.</summary>
-public sealed class AuthService(IAppDbContext db, IPasswordHasher passwordHasher, IEmailSender emailSender, TimeProvider clock)
+public sealed class AuthService(
+    IAppDbContext db,
+    IPasswordHasher passwordHasher,
+    IEmailSender emailSender,
+    IPublicUrlProvider publicUrl,
+    TimeProvider clock)
 {
     /// <summary>Минимальная длина пароля.</summary>
     public const int MinPasswordLength = 8;
@@ -71,7 +76,7 @@ public sealed class AuthService(IAppDbContext db, IPasswordHasher passwordHasher
         await emailSender.SendAsync(
             user.Email,
             "Подтверждение email",
-            $"Подтвердите email, открыв ссылку /confirm-email?token={rawToken}",
+            $"Подтвердите email, открыв ссылку {BuildLink($"/confirm-email?token={rawToken}")}",
             cancellationToken);
 
         return AuthenticatedUser.From(user);
@@ -174,7 +179,7 @@ public sealed class AuthService(IAppDbContext db, IPasswordHasher passwordHasher
         await emailSender.SendAsync(
             user.Email,
             "Сброс пароля",
-            $"Чтобы задать новый пароль, откройте ссылку /reset-password?token={rawToken}",
+            $"Чтобы задать новый пароль, откройте ссылку {BuildLink($"/reset-password?token={rawToken}")}",
             cancellationToken);
     }
 
@@ -239,7 +244,13 @@ public sealed class AuthService(IAppDbContext db, IPasswordHasher passwordHasher
         return rawToken;
     }
 
-    private static void ValidatePassword(string password)
+    private string BuildLink(string path)
+    {
+        return $"{publicUrl.BaseUrl.TrimEnd('/')}/{path.TrimStart('/')}";
+    }
+
+    /// <summary>Проверяет пароль по тем же правилам, что и регистрация.</summary>
+    public static void ValidatePassword(string password)
     {
         if (string.IsNullOrEmpty(password) || password.Length < MinPasswordLength)
         {

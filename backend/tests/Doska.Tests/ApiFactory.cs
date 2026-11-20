@@ -30,6 +30,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             "Media:RootPath",
             Path.Combine(AppContext.BaseDirectory, "test-media"));
 
+        // Абсолютный адрес сайта: письма должны содержать рабочие ссылки.
+        builder.UseSetting("App:PublicBaseUrl", "https://doska.example.com");
+
         builder.ConfigureServices(services => services.AddSingleton<IEmailSender>(Emails));
     }
 }

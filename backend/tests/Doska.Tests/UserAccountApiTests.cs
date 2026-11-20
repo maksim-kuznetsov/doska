@@ -45,6 +45,30 @@ public sealed class UserAccountApiTests : IClassFixture<ApiFactory>, IAsyncLifet
     }
 
     [Fact]
+    public async Task Emails_contain_absolute_links()
+    {
+        await EnsureDatabaseAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        using var client = _factory.CreateClient();
+        var email = await RegisterAsync(client, ct);
+
+        var confirmation = Assert.Single(
+            _factory.Emails.Messages,
+            message => message.Email == email && message.Subject == "Подтверждение email");
+        Assert.Contains("https://doska.example.com/confirm-email?token=", confirmation.Body);
+
+        _factory.Emails.Clear();
+        var reset = await client.PostJsonAsync("/api/auth/forgot-password", new { email }, ct);
+        Assert.Equal(HttpStatusCode.NoContent, reset.StatusCode);
+
+        var resetMessage = Assert.Single(
+            _factory.Emails.Messages,
+            message => message.Email == email && message.Subject == "Сброс пароля");
+        Assert.Contains("https://doska.example.com/reset-password?token=", resetMessage.Body);
+    }
+
+    [Fact]
     public async Task Reset_request_sends_link_only_for_existing_email()
     {
         await EnsureDatabaseAsync();

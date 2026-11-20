@@ -1,0 +1,23 @@
+# HTTPS-терминация production: сертификат Let's Encrypt выпускается и продлевается
+# автоматически. Домен и адрес для уведомлений ACME задаются в .env.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode gzip
+
+	# API и статика обслуживаются внутренним nginx. Заголовки перезаписываются,
+	# чтобы приложение видело настоящий адрес клиента и схему https.
+	reverse_proxy web:80 {
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}
