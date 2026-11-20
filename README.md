@@ -46,6 +46,32 @@
 - `curl.exe http://localhost:5000/api/health` — прямой ответ API.
 - `curl.exe http://localhost:5173/api/health` — ответ через прокси Vite.
 
+## PWA
+
+Интерфейс собирается как устанавливаемое приложение: web-манифест, брендовые иконки,
+service worker и офлайн-оболочка. Service worker регистрируется только в production-сборке
+и только в защищённом контексте — по HTTPS или на `localhost`.
+
+- Dev-сервер (`pnpm --dir frontend dev`) PWA не включает: service worker создаётся сборкой.
+- Локальная проверка:
+
+  ```
+  pnpm --dir frontend build
+  pnpm --dir frontend preview
+  ```
+
+  Откройте http://localhost:4173, затем DevTools → Application: проверьте Manifest и
+  Service Workers. Включите offline и перезагрузите страницу — появится офлайн-страница
+  с действием «Повторить».
+
+- Иконки пересобираются из `frontend/public/pwa/logo.svg` командой
+  `pnpm --dir frontend pwa:assets`.
+- В production HTTPS обеспечивает внешний прокси или хостинг: `docker-compose.prod.yml`
+  публикует HTTP-порт. Без HTTPS сайт работает как обычный сайт, но установка и офлайн-режим
+  недоступны.
+- После деплоя новой версии приложение предлагает обновление. Откат выполняется по разделу
+  «Откат релиза»: service worker не кеширует ответы API, поэтому данные не устаревают.
+
 ## Тесты
 
 - Бэкенд: `dotnet test backend/Doska.sln`.
@@ -93,7 +119,8 @@ Workflow `.github/workflows/ci.yml` запускается на push в `master`
 - **Backend** — поднимает PostgreSQL 17 на порту 5433, собирает решение, проверяет, что модель
   EF Core не разошлась с миграциями (`dotnet ef migrations has-pending-model-changes`), применяет
   миграции к чистой базе и запускает `dotnet test`.
-- **Frontend** — устанавливает зависимости по lockfile, запускает `pnpm test` и `pnpm build`.
+- **Frontend** — устанавливает зависимости по lockfile, запускает `pnpm test`, `pnpm build`
+  и `pnpm check:pwa`.
 - **Production images** — после зелёных тестов проверяет `docker-compose.prod.yml` и собирает
   production-образы API и веб-сервера.
 
@@ -105,6 +132,7 @@ dotnet build backend/Doska.sln
 dotnet test backend/Doska.sln
 pnpm --dir frontend test
 pnpm --dir frontend build
+pnpm --dir frontend check:pwa
 ```
 
 Если в вашем окружении `dotnet test` не работает из-за ограничений среды, тесты можно запустить

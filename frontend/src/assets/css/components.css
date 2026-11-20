@@ -662,6 +662,27 @@
   font-weight: var(--font-weight-bold);
 }
 
+/* Действия внутри сообщений об установке и обновлении PWA. */
+.pwa-prompt__text {
+  vertical-align: middle;
+}
+
+.pwa-prompt__actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-left: var(--space-3);
+  vertical-align: middle;
+}
+
+@media (max-width: 768px) {
+  .pwa-prompt__actions {
+    display: flex;
+    margin-top: var(--space-2);
+    margin-left: 0;
+  }
+}
+
 /* Хлебные крошки */
 .breadcrumbs__list {
   display: flex;

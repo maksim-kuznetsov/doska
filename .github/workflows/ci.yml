@@ -105,6 +105,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Check PWA build
+        run: pnpm check:pwa
+
   production-images:
     name: Production images
     runs-on: ubuntu-latest

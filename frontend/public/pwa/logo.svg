@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Doska">
+  <rect width="512" height="512" rx="112" fill="#00AAFF" />
+  <path
+    fill="#FFFFFF"
+    fill-rule="evenodd"
+    d="M168 136h88c74 0 128 50 128 120s-54 120-128 120h-88V136zm64 56v128h24c44 0 72-28 72-64s-28-64-72-64h-24z"
+  />
+</svg>

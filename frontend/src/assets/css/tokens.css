@@ -101,4 +101,10 @@
 
   /* Отступ прилипших боковых колонок ниже шапки с полосой категорий */
   --sticky-offset: calc(var(--header-height) + var(--category-strip-height) + var(--space-4));
+
+  /* Безопасные зоны экрана: вырез, скругления и домашний индикатор. */
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
 }
