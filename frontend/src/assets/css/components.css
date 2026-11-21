@@ -512,6 +512,7 @@
 .ad-card:hover {
   box-shadow: var(--card-hover-shadow);
   transform: translateY(var(--card-hover-lift));
+  text-decoration: none;
 }
 
 .ad-card:focus-visible {

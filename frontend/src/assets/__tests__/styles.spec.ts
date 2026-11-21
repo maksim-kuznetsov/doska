@@ -34,6 +34,10 @@ describe('Сетка карточек ленты', () => {
     expect(media).toContain('overflow: hidden')
     expect(media).toContain('aspect-ratio: var(--card-media-aspect)')
   })
+
+  it('карточка не подчёркивает текст при наведении', () => {
+    expect(ruleBody(css, '.ad-card:hover')).toContain('text-decoration: none')
+  })
 })
 
 describe('Окно просмотра фотографий', () => {
