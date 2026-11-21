@@ -18,6 +18,9 @@ backend/tests/Doska.Tests/bin/**/test-media/
 # Временный файловый ящик писем production (bind-mount docker-compose.prod.yml)
 /outbox/
 
+# Резервные копии production (deploy/backup.sh)
+/backups/
+
 # Интерфейс (дополнительно см. frontend/.gitignore)
 node_modules/
 frontend/dist/
