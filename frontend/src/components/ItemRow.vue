@@ -7,29 +7,29 @@ defineProps<{ ad: AdSummary }>()
 </script>
 
 <template>
-  <article class="ad-row" data-test="my-ad">
-    <div class="ad-row__media">
+  <article class="item-row" data-test="my-item">
+    <div class="item-row__media">
       <img
         v-if="ad.photos.length > 0"
-        class="ad-row__image"
+        class="item-row__image"
         :src="ad.photos[0].thumbnailUrl"
         :alt="ad.title"
       />
-      <div v-else class="ad-row__placeholder" aria-hidden="true">Нет фото</div>
+      <div v-else class="item-row__placeholder" aria-hidden="true">Нет фото</div>
     </div>
 
-    <div class="ad-row__body">
-      <div class="ad-row__head">
-        <h2 class="ad-row__title">{{ ad.title }}</h2>
+    <div class="item-row__body">
+      <div class="item-row__head">
+        <h2 class="item-row__title">{{ ad.title }}</h2>
         <StatusBadge :status="ad.status" />
       </div>
-      <p class="ad-row__meta">
-        <span class="ad-row__price">{{ ad.price }} ₽</span> · {{ ad.contacts }}
+      <p class="item-row__meta">
+        <span class="item-row__price">{{ ad.price }} ₽</span> · {{ ad.contacts }}
       </p>
-      <p v-if="ad.moderationReason" class="ad-row__reason">
+      <p v-if="ad.moderationReason" class="item-row__reason">
         Причина: {{ ad.moderationReason }}
       </p>
-      <div v-if="$slots.actions" class="ad-row__actions">
+      <div v-if="$slots.actions" class="item-row__actions">
         <slot name="actions" />
       </div>
     </div>

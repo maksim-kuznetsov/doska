@@ -75,14 +75,14 @@ onMounted(load)
     />
 
     <div v-if="messages.length > 0" class="split">
-      <div class="ad-list">
+      <div class="item-list">
         <article
           v-for="message in messages"
           :key="message.fileName"
           class="panel stack"
           data-test="outbox-message"
         >
-          <h2 class="ad-row__title">{{ message.subject || '(без темы)' }}</h2>
+          <h2 class="item-row__title">{{ message.subject || '(без темы)' }}</h2>
           <p class="text-muted">
             {{ message.recipient || 'получатель неизвестен' }} ·
             {{ formatDate(message.sentAt ?? message.modifiedAt) }}
@@ -96,7 +96,7 @@ onMounted(load)
       </div>
 
       <section v-if="selected" class="panel stack" data-test="outbox-content">
-        <h2 class="ad-row__title">{{ selected.subject || '(без темы)' }}</h2>
+        <h2 class="item-row__title">{{ selected.subject || '(без темы)' }}</h2>
         <p class="text-muted">{{ selected.recipient }} · {{ selected.fileName }}</p>
         <p v-if="loadingContent" class="text-muted">Загружаем письмо…</p>
         <pre v-else class="outbox-content">{{ content }}</pre>

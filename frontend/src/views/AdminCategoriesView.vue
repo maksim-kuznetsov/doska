@@ -181,7 +181,7 @@ onMounted(load)
 
     <p v-if="loading" class="text-muted">Загружаем…</p>
 
-    <div class="ad-list">
+    <div class="item-list">
       <FormSection v-for="section in sections" :key="section.id" :title="section.name">
         <div class="split">
           <StatusBadge :status="section.isActive ? 'Active' : 'Archived'" />
@@ -217,7 +217,7 @@ onMounted(load)
           <AppButton variant="danger" size="compact" @click="remove(section)">Удалить</AppButton>
         </div>
 
-        <div class="ad-list">
+        <div class="item-list">
           <div
             v-for="subsection in section.subsections"
             :key="subsection.id"
@@ -225,7 +225,7 @@ onMounted(load)
             data-test="admin-subsection"
           >
             <div class="split">
-              <span class="ad-row__title">{{ subsection.name }}</span>
+              <span class="item-row__title">{{ subsection.name }}</span>
               <StatusBadge :status="subsection.isActive ? 'Active' : 'Archived'" />
             </div>
 

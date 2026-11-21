@@ -77,7 +77,7 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'ads/:id',
-        name: 'ad-detail',
+        name: 'item-detail',
         component: AdDetailView,
       },
       {

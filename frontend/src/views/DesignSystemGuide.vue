@@ -9,8 +9,6 @@ import type {
   SectionOption,
 } from '../api/client'
 import ActionLink from '../components/ActionLink.vue'
-import AdCard from '../components/AdCard.vue'
-import AdRow from '../components/AdRow.vue'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
 import Breadcrumbs from '../components/Breadcrumbs.vue'
@@ -26,6 +24,8 @@ import FormGridItem from '../components/FormGridItem.vue'
 import FormLayout from '../components/FormLayout.vue'
 import FormSection from '../components/FormSection.vue'
 import ImageGallery from '../components/ImageGallery.vue'
+import ItemCard from '../components/ItemCard.vue'
+import ItemRow from '../components/ItemRow.vue'
 import ModerationQueueList from '../components/ModerationQueueList.vue'
 import Pagination from '../components/Pagination.vue'
 import PasswordHints from '../components/PasswordHints.vue'
@@ -246,15 +246,15 @@ const guideErrors = [
 
     <div class="guide__section">
       <h2 class="guide__section-title">Карточки, строки и галерея</h2>
-      <div class="ad-grid">
-        <AdCard :ad="adCard" />
+      <div class="item-grid">
+        <ItemCard :ad="adCard" />
       </div>
-      <AdRow :ad="adSummary">
+      <ItemRow :ad="adSummary">
         <template #actions>
           <AppButton variant="secondary" size="compact">Редактировать</AppButton>
           <AppButton variant="danger" size="compact">Удалить</AppButton>
         </template>
-      </AdRow>
+      </ItemRow>
       <ImageGallery :photos="galleryPhotos" />
       <div class="guide__row">
         <StatusBadge status="OnModeration" />

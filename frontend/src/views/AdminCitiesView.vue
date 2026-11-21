@@ -130,7 +130,7 @@ onMounted(load)
       description="Добавьте первый город, чтобы его можно было выбрать при подаче объявления."
     />
 
-    <div v-if="cities.length > 0" class="ad-list">
+    <div v-if="cities.length > 0" class="item-list">
       <FormSection v-for="city in cities" :key="city.id" :title="city.name">
         <div class="split">
           <StatusBadge :status="city.isActive ? 'Active' : 'Archived'" />

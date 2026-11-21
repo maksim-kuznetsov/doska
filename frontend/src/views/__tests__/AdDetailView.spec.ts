@@ -57,7 +57,7 @@ async function mountView() {
     history: createMemoryHistory(),
     routes: [
       { path: '/', name: 'home', component: { template: '<div />' } },
-      { path: '/ads/:id', name: 'ad-detail', component: AdDetailView },
+      { path: '/ads/:id', name: 'item-detail', component: AdDetailView },
     ],
   })
 

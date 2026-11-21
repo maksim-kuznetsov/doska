@@ -3,10 +3,10 @@ import { onMounted, ref } from 'vue'
 
 import { ApiError, api, type AdSummary } from '../api/client'
 import ActionLink from '../components/ActionLink.vue'
-import AdRow from '../components/AdRow.vue'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
 import EmptyState from '../components/EmptyState.vue'
+import ItemRow from '../components/ItemRow.vue'
 
 const ads = ref<AdSummary[]>([])
 const error = ref('')
@@ -90,8 +90,8 @@ onMounted(load)
       description="Подайте первое объявление — оно появится здесь со своим статусом."
     />
 
-    <div v-if="ads.length > 0" class="ad-list">
-      <AdRow v-for="ad in ads" :key="ad.id" :ad="ad">
+    <div v-if="ads.length > 0" class="item-list">
+      <ItemRow v-for="ad in ads" :key="ad.id" :ad="ad">
         <template #actions>
           <RouterLink class="btn btn--secondary btn--compact" :to="`/ads/${ad.id}/edit`">
             Редактировать
@@ -112,7 +112,7 @@ onMounted(load)
           </AppButton>
           <AppButton size="compact" variant="danger" @click="remove(ad)">Удалить</AppButton>
         </template>
-      </AdRow>
+      </ItemRow>
     </div>
   </section>
 </template>

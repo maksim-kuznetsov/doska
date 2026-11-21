@@ -71,10 +71,10 @@ onMounted(load)
       description="Жалобы пользователей на объявления появятся здесь."
     />
 
-    <div v-if="complaints.length > 0" class="ad-list">
+    <div v-if="complaints.length > 0" class="item-list">
       <article v-for="complaint in complaints" :key="complaint.id" class="panel stack">
         <div class="split">
-          <h2 class="ad-row__title">{{ complaint.adTitle }}</h2>
+          <h2 class="item-row__title">{{ complaint.adTitle }}</h2>
           <span class="text-muted">{{ formatDate(complaint.createdAt) }}</span>
         </div>
         <p>Жалоба от {{ complaint.authorEmail }}</p>

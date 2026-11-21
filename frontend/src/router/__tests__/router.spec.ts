@@ -6,7 +6,7 @@ describe('Маршруты объявлений и заглушка', () => {
   it('открывает страницу объявления по адресу', () => {
     const resolved = router.resolve('/ads/ad-42')
 
-    expect(resolved.name).toBe('ad-detail')
+    expect(resolved.name).toBe('item-detail')
     expect(resolved.params.id).toBe('ad-42')
   })
 

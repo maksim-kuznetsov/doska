@@ -477,13 +477,13 @@
 }
 
 /* Сетка ленты и списки */
-.ad-grid {
+.item-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(var(--grid-column-min), 1fr));
   gap: var(--grid-gap);
 }
 
-.ad-list,
+.item-list,
 .moderation-list {
   display: grid;
   gap: var(--space-4);
@@ -493,7 +493,7 @@
 }
 
 /* Карточка объявления */
-.ad-card {
+.item-card {
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -509,18 +509,18 @@
     transform var(--duration-normal) ease;
 }
 
-.ad-card:hover {
+.item-card:hover {
   box-shadow: var(--card-hover-shadow);
   transform: translateY(var(--card-hover-lift));
   text-decoration: none;
 }
 
-.ad-card:focus-visible {
+.item-card:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
 
-.ad-card__media {
+.item-card__media {
   width: 100%;
   min-width: 0;
   aspect-ratio: var(--card-media-aspect);
@@ -528,13 +528,13 @@
   background: var(--color-surface-muted);
 }
 
-.ad-card__image {
+.item-card__image {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.ad-card__placeholder {
+.item-card__placeholder {
   display: grid;
   place-items: center;
   width: 100%;
@@ -543,13 +543,13 @@
   font-size: var(--font-size-sm);
 }
 
-.ad-card__body {
+.item-card__body {
   display: grid;
   gap: var(--space-1);
   padding: var(--space-4);
 }
 
-.ad-card__price {
+.item-card__price {
   color: var(--color-text);
   font-size: var(--price-font-size);
   font-weight: var(--font-weight-bold);
@@ -557,17 +557,17 @@
   white-space: nowrap;
 }
 
-.ad-card__title {
+.item-card__title {
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
 }
 
-.ad-card__meta {
+.item-card__meta {
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
 }
 
-.ad-card__description {
+.item-card__description {
   display: -webkit-box;
   overflow: hidden;
   color: var(--color-text);
@@ -576,7 +576,7 @@
   -webkit-line-clamp: 2;
 }
 
-.ad-card__date {
+.item-card__date {
   color: var(--color-text-soft);
   font-size: var(--font-size-xs);
 }
@@ -1018,7 +1018,7 @@
 }
 
 /* Строка объявления */
-.ad-row {
+.item-row {
   display: grid;
   grid-template-columns: 12rem minmax(0, 1fr);
   gap: var(--space-4);
@@ -1028,20 +1028,20 @@
   background: var(--color-surface);
 }
 
-.ad-row__media {
+.item-row__media {
   aspect-ratio: var(--card-media-aspect);
   overflow: hidden;
   border-radius: var(--radius-md);
   background: var(--color-surface-muted);
 }
 
-.ad-row__image {
+.item-row__image {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.ad-row__placeholder {
+.item-row__placeholder {
   display: grid;
   place-items: center;
   width: 100%;
@@ -1050,14 +1050,14 @@
   font-size: var(--font-size-xs);
 }
 
-.ad-row__body {
+.item-row__body {
   display: grid;
   gap: var(--space-2);
   align-content: start;
   min-width: 0;
 }
 
-.ad-row__head {
+.item-row__head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1065,45 +1065,45 @@
   gap: var(--space-2);
 }
 
-.ad-row__title {
+.item-row__title {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
 }
 
-.ad-row__price {
+.item-row__price {
   font-size: var(--price-font-size);
   font-weight: var(--font-weight-bold);
 }
 
-.ad-row__meta {
+.item-row__meta {
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
 }
 
-.ad-row__reason {
+.item-row__reason {
   color: var(--color-danger-hover);
   font-size: var(--font-size-sm);
 }
 
-.ad-row__actions {
+.item-row__actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
 }
 
 /* Страница объявления */
-.ad-detail {
+.item-detail {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 20rem;
   gap: var(--space-6);
   align-items: start;
 }
 
-.ad-detail__main {
+.item-detail__main {
   min-width: 0;
 }
 
-.ad-detail__aside {
+.item-detail__aside {
   position: sticky;
   top: var(--sticky-offset);
   display: grid;
@@ -1434,11 +1434,11 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .ad-detail {
+  .item-detail {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .ad-detail__aside {
+  .item-detail__aside {
     position: static;
   }
 
@@ -1455,11 +1455,11 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .ad-row {
+  .item-row {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .ad-row__media {
+  .item-row__media {
     max-width: 16rem;
   }
 

@@ -100,10 +100,10 @@ onMounted(load)
       description="Зарегистрированные пользователи появятся здесь."
     />
 
-    <div v-if="users.length > 0" class="ad-list">
+    <div v-if="users.length > 0" class="item-list">
       <article v-for="user in users" :key="user.id" class="panel stack" data-test="admin-user">
         <div class="split">
-          <h2 class="ad-row__title">{{ user.email }}</h2>
+          <h2 class="item-row__title">{{ user.email }}</h2>
           <div class="cluster">
             <StatusBadge :status="user.isBlocked ? 'Hidden' : 'Active'" />
           </div>

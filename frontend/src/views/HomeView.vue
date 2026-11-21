@@ -16,11 +16,11 @@ import {
   toSearchParams,
   type FeedFilters,
 } from '../api/search'
-import AdCard from '../components/AdCard.vue'
 import AppMessage from '../components/AppMessage.vue'
 import CategoryTiles from '../components/CategoryTiles.vue'
 import EmptyState from '../components/EmptyState.vue'
 import FilterPanel from '../components/FilterPanel.vue'
+import ItemCard from '../components/ItemCard.vue'
 import Pagination from '../components/Pagination.vue'
 import PromoBanner from '../components/PromoBanner.vue'
 import ResultsBar from '../components/ResultsBar.vue'
@@ -150,8 +150,8 @@ onMounted(async () => {
       description="Фильтры сохранены — измените условия или сбросьте их."
     />
 
-    <div v-if="items.length > 0" class="ad-grid">
-      <AdCard v-for="ad in items" :key="ad.id" :ad="ad" />
+    <div v-if="items.length > 0" class="item-grid">
+      <ItemCard v-for="ad in items" :key="ad.id" :ad="ad" />
     </div>
 
     <Pagination

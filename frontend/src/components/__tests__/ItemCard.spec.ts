@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { describe, expect, it } from 'vitest'
 
-import AdCard from '../AdCard.vue'
+import ItemCard from '../ItemCard.vue'
 
 const ad = {
   id: 'ad-1',
@@ -21,17 +21,17 @@ async function mountCard() {
     history: createMemoryHistory(),
     routes: [
       { path: '/', name: 'home', component: { template: '<div />' } },
-      { path: '/ads/:id', name: 'ad-detail', component: { template: '<div />' } },
+      { path: '/ads/:id', name: 'item-detail', component: { template: '<div />' } },
     ],
   })
 
   await router.push('/')
   await router.isReady()
 
-  return mount(AdCard, { props: { ad }, global: { plugins: [router] } })
+  return mount(ItemCard, { props: { ad }, global: { plugins: [router] } })
 }
 
-describe('AdCard', () => {
+describe('ItemCard', () => {
   it('ведёт на публичную страницу объявления', async () => {
     const wrapper = await mountCard()
 

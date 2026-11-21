@@ -104,14 +104,14 @@ onMounted(async () => {
       </template>
     </EmptyState>
 
-    <article v-if="ad" class="ad-detail">
-      <div class="ad-detail__main stack">
+    <article v-if="ad" class="item-detail">
+      <div class="item-detail__main stack">
         <h1 class="page__title">{{ ad.title }}</h1>
 
         <ImageGallery :photos="ad.photos" />
 
         <div class="panel stack">
-          <p class="ad-card__meta">
+          <p class="item-card__meta">
             <template v-if="sectionName">{{ sectionName }} — </template>{{ categoryName }} ·
             {{ cityName }}
           </p>
@@ -120,9 +120,9 @@ onMounted(async () => {
         </div>
       </div>
 
-      <aside class="ad-detail__aside">
+      <aside class="item-detail__aside">
         <div class="panel stack">
-          <span class="ad-card__price">{{ ad.price }} ₽</span>
+          <span class="item-card__price">{{ ad.price }} ₽</span>
           <div class="stack stack--compact">
             <p class="text-muted">Контакты</p>
             <p>{{ ad.contacts }}</p>

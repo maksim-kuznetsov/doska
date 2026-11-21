@@ -23,11 +23,11 @@ function ruleBody(source: string, selector: string): string {
 
 describe('Сетка карточек ленты', () => {
   it('карточка ограничивает минимальную ширину grid-элемента', () => {
-    expect(ruleBody(css, '.ad-card')).toContain('min-width: 0')
+    expect(ruleBody(css, '.item-card')).toContain('min-width: 0')
   })
 
   it('медиа-блок карточки удерживает ширину и обрезает фото', () => {
-    const media = ruleBody(css, '.ad-card__media')
+    const media = ruleBody(css, '.item-card__media')
 
     expect(media).toContain('width: 100%')
     expect(media).toContain('min-width: 0')
@@ -36,7 +36,7 @@ describe('Сетка карточек ленты', () => {
   })
 
   it('карточка не подчёркивает текст при наведении', () => {
-    expect(ruleBody(css, '.ad-card:hover')).toContain('text-decoration: none')
+    expect(ruleBody(css, '.item-card:hover')).toContain('text-decoration: none')
   })
 })
 
