@@ -68,6 +68,10 @@ async function submit(): Promise<void> {
     </p>
 
     <p class="text-muted">
+      <RouterLink class="link" to="/resend-confirmation">Не пришло письмо подтверждения?</RouterLink>
+    </p>
+
+    <p class="text-muted">
       Нет аккаунта?
       <RouterLink class="link" to="/register">Зарегистрироваться</RouterLink>
     </p>

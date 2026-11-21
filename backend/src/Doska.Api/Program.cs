@@ -211,13 +211,33 @@ builder.Services.AddAntiforgery(options => options.HeaderName = "X-CSRF-TOKEN");
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Пределы настраиваются, чтобы интеграционные тесты могли поднять их для обычных
+    // сценариев и понизить лимит повторных писем для проверки отказа 429.
+    var sensitivePermitLimit = builder.Configuration.GetValue(
+        "RateLimit:Sensitive:PermitLimit",
+        30);
+    var confirmationResendPermitLimit = builder.Configuration.GetValue(
+        "RateLimit:ConfirmationResend:PermitLimit",
+        5);
+
     options.AddPolicy(RateLimitPolicies.Sensitive, context =>
         RateLimitPartition.GetFixedWindowLimiter(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 30,
+                PermitLimit = sensitivePermitLimit,
                 Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
+
+    options.AddPolicy(RateLimitPolicies.ConfirmationResend, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = confirmationResendPermitLimit,
+                Window = TimeSpan.FromMinutes(15),
                 QueueLimit = 0,
             }));
 });

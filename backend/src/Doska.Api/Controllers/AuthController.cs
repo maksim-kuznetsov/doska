@@ -81,6 +81,18 @@ public sealed class AuthController(AuthService authService) : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Повторно отправляет письмо подтверждения; ответ не раскрывает состояние аккаунта.</summary>
+    [HttpPost("resend-confirmation")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.ConfirmationResend)]
+    public async Task<IActionResult> ResendConfirmation(
+        [FromBody] ResendConfirmationRequest request,
+        CancellationToken cancellationToken)
+    {
+        await authService.RequestEmailConfirmationResendAsync(request.Email, cancellationToken);
+        return NoContent();
+    }
+
     /// <summary>Запрашивает сброс пароля; ответ не раскрывает существование аккаунта.</summary>
     [HttpPost("forgot-password")]
     [AllowAnonymous]

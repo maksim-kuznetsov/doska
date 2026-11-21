@@ -9,10 +9,13 @@ namespace Doska.Tests;
 /// Фабрика API для интеграционных тестов: фиксирует окружение Development,
 /// чтобы работали CORS и Swagger, как при локальном запуске.
 /// </summary>
-public sealed class ApiFactory : WebApplicationFactory<Program>
+public class ApiFactory : WebApplicationFactory<Program>
 {
     /// <summary>Сборщик отправленных писем: подменяет настоящую отправку.</summary>
     public CapturingEmailSender Emails { get; } = new();
+
+    /// <summary>Предел повторных писем подтверждения за 15 минут для обычных тестов.</summary>
+    protected virtual int ConfirmationResendPermitLimit => 1000;
 
     /// <summary>Каталог файлового ящика писем для тестов (свой у каждой фабрики).</summary>
     public string OutboxPath { get; } = Path.Combine(
@@ -41,6 +44,14 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
         // Абсолютный адрес сайта: письма должны содержать рабочие ссылки.
         builder.UseSetting("App:PublicBaseUrl", "https://doska.example.com");
+
+        // Высокие пределы для обычных тестов: общий лимит чувствительных операций
+        // и повторных писем подтверждения не должны ломать сценарии. Отдельная
+        // фабрика понижает лимит повторных писем для проверки 429.
+        builder.UseSetting("RateLimit:Sensitive:PermitLimit", "1000");
+        builder.UseSetting(
+            "RateLimit:ConfirmationResend:PermitLimit",
+            ConfirmationResendPermitLimit.ToString());
 
         builder.ConfigureServices(services => services.AddSingleton<IEmailSender>(Emails));
     }

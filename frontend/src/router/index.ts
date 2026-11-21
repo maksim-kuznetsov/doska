@@ -20,6 +20,7 @@ import ModerationQueueView from '../views/ModerationQueueView.vue'
 import MyAdsView from '../views/MyAdsView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
 import RegisterView from '../views/RegisterView.vue'
+import ResendConfirmationView from '../views/ResendConfirmationView.vue'
 import ResetPasswordView from '../views/ResetPasswordView.vue'
 
 const routes: RouteRecordRaw[] = [
@@ -56,6 +57,11 @@ const routes: RouteRecordRaw[] = [
         path: 'reset-password',
         name: 'reset-password',
         component: ResetPasswordView,
+      },
+      {
+        path: 'resend-confirmation',
+        name: 'resend-confirmation',
+        component: ResendConfirmationView,
       },
       {
         path: 'ads/new',

@@ -15,4 +15,7 @@ public static class RateLimitPolicies
 {
     /// <summary>Чувствительные операции: вход, регистрация, подача объявления.</summary>
     public const string Sensitive = "Sensitive";
+
+    /// <summary>Повторная отправка письма подтверждения email.</summary>
+    public const string ConfirmationResend = "ConfirmationResend";
 }

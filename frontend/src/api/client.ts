@@ -296,6 +296,8 @@ export const api = {
       request<void>('/auth/confirm-email', { method: 'POST', body: { token } }),
     forgotPassword: (email: string) =>
       request<void>('/auth/forgot-password', { method: 'POST', body: { email } }),
+    resendConfirmation: (email: string) =>
+      request<void>('/auth/resend-confirmation', { method: 'POST', body: { email } }),
     resetPassword: (token: string, password: string) =>
       request<void>('/auth/reset-password', { method: 'POST', body: { token, password } }),
     logout: () => request<void>('/auth/logout', { method: 'POST' }),

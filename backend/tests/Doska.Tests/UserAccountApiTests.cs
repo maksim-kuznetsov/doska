@@ -1,5 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.RegularExpressions;
 using Doska.Application.Abstractions;
 using Doska.Domain.Entities;
 using Doska.Domain.Enums;
@@ -66,6 +69,165 @@ public sealed class UserAccountApiTests : IClassFixture<ApiFactory>, IAsyncLifet
             _factory.Emails.Messages,
             message => message.Email == email && message.Subject == "Сброс пароля");
         Assert.Contains("https://doska.example.com/reset-password?token=", resetMessage.Body);
+    }
+
+    [Fact]
+    public async Task Confirmation_email_contains_url_safe_token()
+    {
+        await EnsureDatabaseAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        using var client = _factory.CreateClient();
+        var email = await RegisterAsync(client, ct);
+        var token = GetConfirmationToken(email);
+
+        Assert.Matches(new Regex("^[A-Za-z0-9_-]{43}$"), token);
+        Assert.DoesNotContain('+', token);
+        Assert.DoesNotContain('/', token);
+        Assert.DoesNotContain('=', token);
+    }
+
+    [Fact]
+    public async Task Confirmation_link_confirms_account_and_cannot_be_reused()
+    {
+        await EnsureDatabaseAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        using var client = _factory.CreateClient();
+        var email = await RegisterAsync(client, ct);
+        var token = GetConfirmationToken(email);
+
+        var confirm = await client.PostJsonAsync("/api/auth/confirm-email", new { token }, ct);
+        Assert.Equal(HttpStatusCode.NoContent, confirm.StatusCode);
+
+        var current = await client.GetFromJsonAsync<CurrentUserPayload>("/api/auth/me", ct);
+        Assert.True(current!.IsEmailConfirmed);
+
+        var reused = await client.PostJsonAsync("/api/auth/confirm-email", new { token }, ct);
+        Assert.Equal(HttpStatusCode.BadRequest, reused.StatusCode);
+    }
+
+    [Fact]
+    public async Task Legacy_base64_confirmation_token_still_confirms_account()
+    {
+        await EnsureDatabaseAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        using var client = _factory.CreateClient();
+        var email = await RegisterAsync(client, ct);
+
+        // Токен прежнего формата: стандартный Base64 из 32 байт, с завершающим «=».
+        var legacyToken = Convert.ToBase64String(
+            Enumerable.Range(0, 32).Select(value => (byte)value).ToArray());
+        Assert.EndsWith("=", legacyToken);
+
+        var legacyHash = Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes(legacyToken))).ToLowerInvariant();
+
+        await TestDatabase.WithContextAsync(_factory, async db =>
+        {
+            var user = await db.Users.FirstAsync(candidate => candidate.Email == email, ct);
+            db.UserTokens.Add(new UserToken
+            {
+                UserId = user.Id,
+                TokenHash = legacyHash,
+                Purpose = TokenPurpose.EmailConfirmation,
+                ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
+            });
+            await db.SaveChangesAsync(ct);
+        });
+
+        var confirm = await client.PostJsonAsync(
+            "/api/auth/confirm-email",
+            new { token = legacyToken },
+            ct);
+        Assert.Equal(HttpStatusCode.NoContent, confirm.StatusCode);
+
+        var current = await client.GetFromJsonAsync<CurrentUserPayload>("/api/auth/me", ct);
+        Assert.True(current!.IsEmailConfirmed);
+    }
+
+    [Fact]
+    public async Task Resend_confirmation_sends_new_email_and_invalidates_previous_link()
+    {
+        await EnsureDatabaseAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        using var client = _factory.CreateClient();
+        var email = await RegisterAsync(client, ct);
+        var firstToken = GetConfirmationToken(email);
+
+        _factory.Emails.Clear();
+        var resend = await client.PostJsonAsync("/api/auth/resend-confirmation", new { email }, ct);
+        Assert.Equal(HttpStatusCode.NoContent, resend.StatusCode);
+
+        var message = Assert.Single(
+            _factory.Emails.Messages,
+            candidate => candidate.Email == email && candidate.Subject == "Подтверждение email");
+        var secondToken = ExtractToken(message.Body, "В письме нет ссылки подтверждения.");
+
+        Assert.NotEqual(firstToken, secondToken);
+        Assert.Matches(new Regex("^[A-Za-z0-9_-]{43}$"), secondToken);
+
+        var stale = await client.PostJsonAsync(
+            "/api/auth/confirm-email",
+            new { token = firstToken },
+            ct);
+        Assert.Equal(HttpStatusCode.BadRequest, stale.StatusCode);
+
+        var fresh = await client.PostJsonAsync(
+            "/api/auth/confirm-email",
+            new { token = secondToken },
+            ct);
+        Assert.Equal(HttpStatusCode.NoContent, fresh.StatusCode);
+    }
+
+    [Fact]
+    public async Task Resend_confirmation_is_silent_for_unknown_and_confirmed_email()
+    {
+        await EnsureDatabaseAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        using var client = _factory.CreateClient();
+        var missingEmail = $"accounts-missing-{Guid.NewGuid():N}@example.com";
+
+        _factory.Emails.Clear();
+        var missing = await client.PostJsonAsync(
+            "/api/auth/resend-confirmation",
+            new { email = missingEmail },
+            ct);
+        Assert.Equal(HttpStatusCode.NoContent, missing.StatusCode);
+        Assert.DoesNotContain(_factory.Emails.Messages, message => message.Email == missingEmail);
+
+        var email = await RegisterAsync(client, ct);
+        var token = GetConfirmationToken(email);
+        var confirm = await client.PostJsonAsync("/api/auth/confirm-email", new { token }, ct);
+        Assert.Equal(HttpStatusCode.NoContent, confirm.StatusCode);
+
+        _factory.Emails.Clear();
+        var confirmed = await client.PostJsonAsync("/api/auth/resend-confirmation", new { email }, ct);
+        Assert.Equal(HttpStatusCode.NoContent, confirmed.StatusCode);
+        Assert.DoesNotContain(_factory.Emails.Messages, message => message.Email == email);
+    }
+
+    [Fact]
+    public async Task Resend_confirmation_is_rate_limited()
+    {
+        await EnsureDatabaseAsync();
+
+        using var factory = new LowLimitApiFactory();
+        using var client = factory.CreateClient();
+        var ct = TestContext.Current.CancellationToken;
+        var email = $"accounts-missing-{Guid.NewGuid():N}@example.com";
+
+        var first = await client.PostJsonAsync("/api/auth/resend-confirmation", new { email }, ct);
+        var second = await client.PostJsonAsync("/api/auth/resend-confirmation", new { email }, ct);
+        var third = await client.PostJsonAsync("/api/auth/resend-confirmation", new { email }, ct);
+
+        Assert.Equal(HttpStatusCode.NoContent, first.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, second.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, third.StatusCode);
+        Assert.DoesNotContain(factory.Emails.Messages, message => message.Email == email);
     }
 
     [Fact]
@@ -313,6 +475,14 @@ public sealed class UserAccountApiTests : IClassFixture<ApiFactory>, IAsyncLifet
         return email;
     }
 
+    private string GetConfirmationToken(string email)
+    {
+        var message = _factory.Emails.Messages.Last(candidate =>
+            candidate.Email == email && candidate.Subject == "Подтверждение email");
+
+        return ExtractToken(message.Body, "В письме нет ссылки подтверждения.");
+    }
+
     private async Task<string> RequestResetTokenAsync(
         HttpClient client,
         string email,
@@ -328,11 +498,16 @@ public sealed class UserAccountApiTests : IClassFixture<ApiFactory>, IAsyncLifet
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
         var message = Assert.Single(_factory.Emails.Messages, candidate => candidate.Email == email);
-        var marker = "token=";
-        var index = message.Body.IndexOf(marker, StringComparison.Ordinal);
-        Assert.True(index >= 0, "В письме нет ссылки сброса.");
+        return ExtractToken(message.Body, "В письме нет ссылки сброса.");
+    }
 
-        return message.Body[(index + marker.Length)..].Trim();
+    private static string ExtractToken(string body, string message)
+    {
+        var marker = "token=";
+        var index = body.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(index >= 0, message);
+
+        return body[(index + marker.Length)..].Trim();
     }
 
     private async Task LoginAsync(HttpClient client, string email, CancellationToken cancellationToken)
@@ -369,6 +544,8 @@ public sealed class UserAccountApiTests : IClassFixture<ApiFactory>, IAsyncLifet
         return email;
     }
 
+    private sealed record CurrentUserPayload(Guid Id, string Email, bool IsEmailConfirmed);
+
     private sealed record AdminUserPayload(
         Guid Id,
         string Email,
@@ -376,4 +553,11 @@ public sealed class UserAccountApiTests : IClassFixture<ApiFactory>, IAsyncLifet
         bool IsTrusted,
         bool IsBlocked,
         bool IsEmailConfirmed);
+}
+
+/// <summary>Фабрика с низким лимитом повторных писем подтверждения для проверки ответа 429.</summary>
+public sealed class LowLimitApiFactory : ApiFactory
+{
+    /// <inheritdoc />
+    protected override int ConfirmationResendPermitLimit => 2;
 }

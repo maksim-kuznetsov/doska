@@ -1,3 +1,4 @@
+using System.Buffers.Text;
 using System.Security.Cryptography;
 using Doska.Application.Abstractions;
 using Doska.Application.Common;
@@ -73,11 +74,7 @@ public sealed class AuthService(
 
         var rawToken = CreateToken(user.Id, TokenPurpose.EmailConfirmation, ConfirmationTokenLifetime);
         await db.SaveChangesAsync(cancellationToken);
-        await emailSender.SendAsync(
-            user.Email,
-            "Подтверждение email",
-            $"Подтвердите email, открыв ссылку {BuildLink($"/confirm-email?token={rawToken}")}",
-            cancellationToken);
+        await SendConfirmationEmailAsync(user, rawToken, cancellationToken);
 
         return AuthenticatedUser.From(user);
     }
@@ -136,6 +133,49 @@ public sealed class AuthService(
     }
 
     /// <summary>
+    /// Повторно отправляет письмо подтверждения. Письмо уходит только для существующего
+    /// неподтверждённого аккаунта, но метод всегда завершается успешно, не раскрывая состояние.
+    /// </summary>
+    public async Task RequestEmailConfirmationResendAsync(
+        string email,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedEmail = (email ?? string.Empty).Trim();
+
+        if (normalizedEmail.Length == 0)
+        {
+            return;
+        }
+
+        var user = await db.Users.FirstOrDefaultAsync(
+            candidate => candidate.Email.ToLower() == normalizedEmail.ToLower(),
+            cancellationToken);
+
+        if (user is null || user.IsBlocked || user.IsEmailConfirmed)
+        {
+            return;
+        }
+
+        var now = clock.GetUtcNow();
+
+        var pending = await db.UserTokens
+            .Where(token =>
+                token.UserId == user.Id
+                && token.Purpose == TokenPurpose.EmailConfirmation
+                && token.UsedAt == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var token in pending)
+        {
+            token.UsedAt = now;
+        }
+
+        var rawToken = CreateToken(user.Id, TokenPurpose.EmailConfirmation, ConfirmationTokenLifetime);
+        await db.SaveChangesAsync(cancellationToken);
+        await SendConfirmationEmailAsync(user, rawToken, cancellationToken);
+    }
+
+    /// <summary>
     /// Запрашивает сброс пароля. Отправляет письмо только для существующего адреса,
     /// но всегда завершается успешно, не раскрывая, зарегистрирован ли адрес.
     /// </summary>
@@ -179,7 +219,7 @@ public sealed class AuthService(
         await emailSender.SendAsync(
             user.Email,
             "Сброс пароля",
-            $"Чтобы задать новый пароль, откройте ссылку {BuildLink($"/reset-password?token={rawToken}")}",
+            $"Чтобы задать новый пароль, откройте ссылку {BuildLink("/reset-password", rawToken)}",
             cancellationToken);
     }
 
@@ -232,7 +272,7 @@ public sealed class AuthService(
 
     private string CreateToken(Guid userId, TokenPurpose purpose, TimeSpan lifetime)
     {
-        var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        var rawToken = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32));
         db.UserTokens.Add(new UserToken
         {
             UserId = userId,
@@ -244,9 +284,21 @@ public sealed class AuthService(
         return rawToken;
     }
 
-    private string BuildLink(string path)
+    private string BuildLink(string path, string rawToken)
     {
-        return $"{publicUrl.BaseUrl.TrimEnd('/')}/{path.TrimStart('/')}";
+        return $"{publicUrl.BaseUrl.TrimEnd('/')}/{path.TrimStart('/')}?token={Uri.EscapeDataString(rawToken)}";
+    }
+
+    private Task SendConfirmationEmailAsync(
+        User user,
+        string rawToken,
+        CancellationToken cancellationToken)
+    {
+        return emailSender.SendAsync(
+            user.Email,
+            "Подтверждение email",
+            $"Подтвердите email, открыв ссылку {BuildLink("/confirm-email", rawToken)}",
+            cancellationToken);
     }
 
     /// <summary>Проверяет пароль по тем же правилам, что и регистрация.</summary>

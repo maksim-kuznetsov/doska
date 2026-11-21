@@ -37,6 +37,10 @@ onMounted(async () => {
     <AppMessage v-else-if="state === 'done'" variant="success">{{ message }}</AppMessage>
     <p v-else class="text-muted">{{ message }}</p>
 
+    <p v-if="state === 'failed'">
+      <RouterLink class="link" to="/resend-confirmation">Запросить новое письмо</RouterLink>
+    </p>
+
     <p>
       <RouterLink class="link" to="/ads/mine">Перейти к объявлениям</RouterLink>
     </p>
