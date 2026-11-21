@@ -8,6 +8,11 @@ const css = readFileSync(
   'utf8',
 )
 
+const layoutCss = readFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), '../css/layout.css'),
+  'utf8',
+)
+
 /** Возвращает тело CSS-правила по селектору (`selector { ... }`). */
 function ruleBody(source: string, selector: string): string {
   const index = source.indexOf(`${selector} {`)
@@ -20,6 +25,72 @@ function ruleBody(source: string, selector: string): string {
 
   return source.slice(start + 1, end)
 }
+
+/** Возвращает тело медиазапроса с учётом вложенных фигурных скобок. */
+function mediaBody(source: string, query: string): string {
+  const index = source.indexOf(`${query} {`)
+  if (index === -1) {
+    throw new Error(`Медиазапрос ${query} не найден`)
+  }
+
+  const start = source.indexOf('{', index)
+  let depth = 0
+
+  for (let position = start; position < source.length; position += 1) {
+    if (source[position] === '{') {
+      depth += 1
+    } else if (source[position] === '}') {
+      depth -= 1
+      if (depth === 0) {
+        return source.slice(start + 1, position)
+      }
+    }
+  }
+
+  throw new Error(`Не найден конец медиазапроса ${query}`)
+}
+
+/** Делит значение CSS-шортката на части по пробелам вне скобок. */
+function shorthandValues(value: string): string[] {
+  const parts: string[] = []
+  let current = ''
+  let depth = 0
+
+  for (const char of value) {
+    if (char === '(') {
+      depth += 1
+    } else if (char === ')') {
+      depth -= 1
+    }
+
+    if (/\s/.test(char) && depth === 0) {
+      if (current.length > 0) {
+        parts.push(current)
+        current = ''
+      }
+      continue
+    }
+
+    current += char
+  }
+
+  if (current.length > 0) {
+    parts.push(current)
+  }
+
+  return parts
+}
+
+/** Возвращает значения шортката padding правила в порядке top/right/bottom/left. */
+function paddingValues(rule: string): string[] {
+  const match = rule.match(/padding:\s*([\s\S]*?);/)
+  if (!match) {
+    throw new Error('Не найдено свойство padding')
+  }
+
+  return shorthandValues(match[1])
+}
+
 
 describe('Сетка карточек ленты', () => {
   it('карточка ограничивает минимальную ширину grid-элемента', () => {
@@ -70,3 +141,18 @@ describe('Окно просмотра фотографий', () => {
     expect(ruleBody(css, '.photo-viewer::backdrop')).toContain('background: var(--color-overlay)')
   })
 })
+
+describe('Шапка на мобильной ширине', () => {
+  it('на настольной ширине низ шапки не задаёт отступ: его даёт полоса разделов', () => {
+    expect(paddingValues(ruleBody(layoutCss, '.site-header__inner'))[2]).toBe('0')
+  })
+
+  it('на мобильной ширине отделяет последнюю строку шапки от нижней границы', () => {
+    const mobile = mediaBody(layoutCss, '@media (max-width: 768px)')
+    const padding = paddingValues(ruleBody(mobile, '.site-header__inner'))
+
+    expect(padding[2]).not.toBe('0')
+    expect(padding[2]).toBe('var(--space-3)')
+  })
+})
+
