@@ -16,6 +16,10 @@
     "opsx": {
       "description": "Полный цикл OpenSpec: propose → apply → archive → commit",
       "template": "Выполни полный цикл OpenSpec для: $ARGUMENTS\n\n1. Создай change со всеми артефактами (skill openspec-propose).\n2. Сразу примени его (skill openspec-apply-change) и прогони тесты `dotnet test` (для изменений интерфейса дополнительно `pnpm test` в каталоге `web`).\n3. Архивируй change (skill openspec-archive-change).\n4. Сделай git-коммиты на русском: сначала по изменениям кода, затем «Архивировать change <name>».\n\nМежду шагами подтверждений не спрашивай. Остановись и уточни только при существенной неоднозначности, меняющей объём работ или поведение."
+    },
+    "deploy": {
+      "description": "Обновить production на VPS: бэкап, git pull, пересборка и проверка",
+      "template": "Используй скилл deploy и выпусти изменения на боевой сервер. $ARGUMENTS\n\nАдрес сервера и домен бери из переменных окружения DOSKA_PROD_SSH и DOSKA_PROD_DOMAIN; если DOSKA_PROD_SSH не задана — сообщи, как её задать, и дождись. Сначала убедись, что код закоммичен и запушен в origin/master. Затем выполни выпуск командой `ssh \"$DOSKA_PROD_SSH\" 'cd /srv/doska && bash deploy/release.sh'` (скрипт сам делает бэкап, git pull, пересборку, проверку здоровья и откат при ошибке) и проверь `https://$DOSKA_PROD_DOMAIN/api/health`. Останови выполнение и сообщи при любой ошибке."
     }
   }
 }
