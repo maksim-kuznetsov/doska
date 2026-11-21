@@ -40,6 +40,23 @@ describe('Сетка карточек ленты', () => {
   })
 })
 
+describe('Полоса разделов в шапке', () => {
+  it('скрывает системную полосу прокрутки у списка разделов', () => {
+    expect(ruleBody(css, '.category-strip__list')).toContain('scrollbar-width: none')
+  })
+
+  it('скрывает полосу прокрутки WebKit у списка разделов', () => {
+    expect(ruleBody(css, '.category-strip__list::-webkit-scrollbar')).toContain('display: none')
+  })
+
+  it('гасит край списка разделов при непросмотренных разделах', () => {
+    const fadeEnd = ruleBody(css, '.category-strip__list--fade-end')
+
+    expect(fadeEnd).toContain('-webkit-mask-image')
+    expect(fadeEnd).toContain('mask-image')
+  })
+})
+
 describe('Окно просмотра фотографий', () => {
   it('вписывает полноразмерное изображение в окно', () => {
     const image = ruleBody(css, '.photo-viewer__image')

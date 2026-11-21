@@ -859,7 +859,39 @@
   padding: 0;
   overflow-x: auto;
   list-style: none;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+}
+
+.category-strip__list::-webkit-scrollbar {
+  display: none;
+}
+
+/* Затухание у края полосы, за которым остались непросмотренные разделы. */
+.category-strip__list--fade-start {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--space-4));
+  mask-image: linear-gradient(to right, transparent, #000 var(--space-4));
+}
+
+.category-strip__list--fade-end {
+  -webkit-mask-image: linear-gradient(to left, transparent, #000 var(--space-4));
+  mask-image: linear-gradient(to left, transparent, #000 var(--space-4));
+}
+
+.category-strip__list--fade-start.category-strip__list--fade-end {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--space-4),
+    #000 calc(100% - var(--space-4)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--space-4),
+    #000 calc(100% - var(--space-4)),
+    transparent
+  );
 }
 
 .category-strip__link {
