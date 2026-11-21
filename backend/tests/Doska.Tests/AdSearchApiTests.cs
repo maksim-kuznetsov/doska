@@ -199,9 +199,12 @@ public sealed class AdSearchApiTests : IClassFixture<ApiFactory>, IAsyncLifetime
         var authorId = await CreateAuthorAsync();
         var (_, subsectionId, _, cityId, _) = await CreateCatalogAsync();
 
-        var oldest = new DateTimeOffset(2026, 11, 10, 10, 0, 0, TimeSpan.Zero);
-        var middle = new DateTimeOffset(2026, 11, 15, 10, 0, 0, TimeSpan.Zero);
-        var newest = new DateTimeOffset(2026, 11, 18, 10, 0, 0, TimeSpan.Zero);
+        // Даты в пределах срока жизни объявления (Ad.LifetimeDays): иначе параллельный
+        // тест автоархива в ClassifiedAdsApiTests переведёт их в архив во время проверки.
+        var now = DateTimeOffset.UtcNow;
+        var oldest = now.AddDays(-3);
+        var middle = now.AddDays(-2);
+        var newest = now.AddDays(-1);
 
         await CreateAdAsync(authorId, subsectionId, cityId, $"{AdPrefix}Триста", "Описание", 300m, AdStatus.Active, oldest);
         await CreateAdAsync(authorId, subsectionId, cityId, $"{AdPrefix}Сто", "Описание", 100m, AdStatus.Active, middle);

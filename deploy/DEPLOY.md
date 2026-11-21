@@ -199,13 +199,14 @@ curl -I http://doska.example.com
 ```bash
 cd /srv/doska
 docker compose -f docker-compose.prod.yml run --rm api init-data
+docker compose -f docker-compose.prod.yml run --rm api seed-catalog
 docker compose -f docker-compose.prod.yml run --rm \
   -e Admin__Email=admin@example.com \
   -e Admin__Password='<длинный пароль>' \
   api create-admin
 ```
 
-Команды можно запускать повторно: справочники не дублируются, а `create-admin` обновляет роль и пароль существующего пользователя.
+`seed-catalog` — расширенный справочник: административные центры субъектов РФ и крупнейшие города (94 города), дерево категорий по образцу avito.ru и вариант «Другой» в каждом списке. Команды можно запускать повторно: справочники не дублируются, существующие записи не перезаписываются, а `create-admin` обновляет роль и пароль существующего пользователя.
 
 После создания войдите в интерфейс и смените пароль через личный кабинет. Пароль из переменной окружения не должен остаться в истории команд: при необходимости очистите её (`history -c`).
 

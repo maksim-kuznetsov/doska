@@ -256,6 +256,12 @@ if (args.Contains("init-data", StringComparer.OrdinalIgnoreCase))
     return;
 }
 
+if (args.Contains("seed-catalog", StringComparer.OrdinalIgnoreCase))
+{
+    await SeedCatalogAsync(app);
+    return;
+}
+
 if (args.Contains("create-admin", StringComparer.OrdinalIgnoreCase))
 {
     Environment.ExitCode = await CreateAdminAsync(app);
@@ -333,6 +339,31 @@ static async Task InitReferenceDataAsync(WebApplication app)
 
     await ReferenceDataSeeder.SeedAsync(context);
     logger.LogInformation("Справочники городов и категорий созданы.");
+}
+
+static async Task SeedCatalogAsync(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    var logger = scope.ServiceProvider
+        .GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Doska.SeedCatalog");
+    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+    var result = await ExtendedCatalogSeeder.SeedAsync(context);
+
+    logger.LogInformation(
+        "Расширенный справочник: добавлено городов — {Cities}, разделов — {Sections}, подразделов — {Subsections}; пропущено занятых названий — {Skipped}.",
+        result.CitiesAdded,
+        result.SectionsAdded,
+        result.SubsectionsAdded,
+        result.Skipped.Count);
+
+    if (result.Skipped.Count > 0)
+    {
+        logger.LogWarning(
+            "Названия, занятые категорией с другим родителем, пропущены: {Names}.",
+            string.Join(", ", result.Skipped));
+    }
 }
 
 static async Task<int> CreateAdminAsync(WebApplication app)
