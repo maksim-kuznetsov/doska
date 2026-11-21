@@ -113,6 +113,30 @@ public sealed class ClassifiedAdsApiTests : IClassFixture<ApiFactory>, IAsyncLif
     }
 
     [Fact]
+    public async Task Create_accepts_photo_near_three_megabytes()
+    {
+        await EnsureDatabaseAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        using var author = _factory.CreateClient();
+        await RegisterAuthorAsync(author, ct);
+        var (cityId, categoryId) = await CreateCatalogAsync();
+
+        var image = CreateLargeTestImage();
+        Assert.InRange(image.Length, 1_000_000, (int)AdService.MaxPhotoBytes);
+
+        using var form = BuildForm($"{AdPrefix}Фото 3,4 МБ", cityId, categoryId);
+        AddPhoto(form, image, "image/png", "large.png");
+
+        var ad = await ReadCreatedAsync(
+            await author.PostContentAsync("/api/ads", form, ct),
+            ct);
+
+        var photo = Assert.Single(ad.Photos);
+        Assert.Equal(image.Length, photo.ByteSize);
+    }
+
+    [Fact]
     public async Task Media_endpoint_serves_original_and_thumbnail()
     {
         await EnsureDatabaseAsync();
@@ -578,6 +602,33 @@ public sealed class ClassifiedAdsApiTests : IClassFixture<ApiFactory>, IAsyncLif
         using (var canvas = new SKCanvas(bitmap))
         {
             canvas.Clear(new SKColor(0x00, 0xAA, 0xFF));
+        }
+
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        return data.ToArray();
+    }
+
+    /// <summary>Крупное изображение с шумом: сжимается плохо и даёт файл больше 1 МБ.</summary>
+    private static byte[] CreateLargeTestImage()
+    {
+        const int width = 1150;
+        const int height = 1000;
+        var random = new Random(20261121);
+
+        using var bitmap = new SKBitmap(width, height);
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                bitmap.SetPixel(
+                    x,
+                    y,
+                    new SKColor(
+                        (byte)random.Next(256),
+                        (byte)random.Next(256),
+                        (byte)random.Next(256)));
+            }
         }
 
         using var image = SKImage.FromBitmap(bitmap);

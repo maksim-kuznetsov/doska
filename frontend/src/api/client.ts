@@ -218,15 +218,32 @@ async function parseResponse<T>(response: Response): Promise<T> {
   }
 
   const text = await response.text()
-  const payload: unknown = text ? JSON.parse(text) : null
+  let payload: unknown = null
+
+  if (text) {
+    try {
+      payload = JSON.parse(text)
+    } catch {
+      // Прокси может вернуть HTML или пустое тело вместо ProblemDetails.
+      payload = null
+    }
+  }
 
   if (!response.ok) {
     const problem = payload as { title?: string; detail?: string } | null
-    const message = problem?.title ?? problem?.detail ?? `Ошибка запроса (${response.status}).`
+    const message = problem?.title ?? problem?.detail ?? fallbackErrorMessage(response.status)
     throw new ApiError(response.status, message)
   }
 
   return payload as T
+}
+
+function fallbackErrorMessage(status: number): string {
+  if (status === 413) {
+    return 'Фотографии слишком большие. Уменьшите файлы: допустимо не более 5 МБ на фотографию.'
+  }
+
+  return `Ошибка запроса (${status}).`
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {

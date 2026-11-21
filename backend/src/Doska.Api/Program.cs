@@ -39,6 +39,11 @@ builder.Services.Configure<FormOptions>(options =>
     options.MemoryBufferThreshold = 10 * 1024 * 1024;
     options.MultipartBodyLengthLimit = 32 * 1024 * 1024;
 });
+
+// Согласуем лимит Kestrel с FormOptions и веб-сервером: запрос с фотографиями
+// в пределах прикладных ограничений не должен отклоняться транспортом с 413.
+builder.WebHost.ConfigureKestrel(options =>
+    options.Limits.MaxRequestBodySize = 32L * 1024 * 1024);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

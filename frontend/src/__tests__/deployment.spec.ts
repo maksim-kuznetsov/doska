@@ -23,7 +23,7 @@ describe('Конфигурация развёртывания', () => {
 
   it('описывает HTTPS через Caddy и не публикует порт веб-сервера', () => {
     const compose = read('docker-compose.prod.yml')
-    const webBlock = / {2}web:\n([\s\S]*?)\n {2}caddy:/.exec(compose)?.[1] ?? ''
+    const webBlock = / {2}web:\r?\n([\s\S]*?)\r?\n {2}caddy:/.exec(compose)?.[1] ?? ''
 
     expect(compose).toContain('caddy:')
     expect(compose).toContain('caddy:2-alpine')

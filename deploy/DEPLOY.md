@@ -473,10 +473,36 @@ docker compose -f docker-compose.prod.yml logs --tail=200 caddy
 | Сертификат не выпускается | A-запись, порт 80, лимиты Let's Encrypt, `docker compose logs caddy`. |
 | `502 Bad Gateway` | API не здоров: `docker compose ps`, `docker compose logs api`. |
 | Фотографии не открываются | том `media-data`, права, строка `X-Accel-Redirect` в логах API. |
+| `413` при загрузке фотографий | Лимит тела запроса на внешнем nginx (`client_max_body_size 32m`), журнал nginx `client intended to send too large body`, явные лимиты Caddy (`request_body`) и CDN/WAF; заголовок `Server` показывает слой. |
 | Письма не приходят | `Email__*` в `.env`, логи API, SPF/DKIM, папка «Спам». |
 | Интерфейс показывает старую версию | service worker предлагает обновление; проверьте, что `web` пересобран. |
 | Мало места | `df -h`, `docker system df`, `docker image prune -f`, старые копии в `backups/`. |
 | API не стартует после обновления | `docker compose logs api`, ошибка миграции, откат по инструкции 2. |
+
+### Лимит размера запроса при загрузке фотографий
+
+Приложение принимает до 5 фотографий по 5 МБ, поэтому каждый слой, принимающий тело запроса, должен допускать не менее 32 МБ. Внутренний nginx из `deploy/nginx.conf` уже настроен (`client_max_body_size 32m`), но production использует внешний обратный прокси — его нужно настроить отдельно.
+
+Для внешнего nginx добавьте директиву в `http`, `server` или `location`, который проксирует запросы к сайту:
+
+```nginx
+client_max_body_size 32m;
+```
+
+Проверьте конфигурацию и перезагрузите nginx:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Caddy по умолчанию не ограничивает размер тела запроса; если перед сайтом стоит Caddy, проверьте явные ограничения (`request_body { max_size ... }`). Если используется CDN или WAF, проверьте его лимит на размер запроса.
+
+Проверка: подайте объявление с фотографией 3–5 МБ. В DevTools → Network ответ `POST /api/ads` должен быть `201 Created`, а объявление — появиться в списке. Если `413` сохраняется, найдите слой по заголовку `Server` и журналу nginx:
+
+```bash
+sudo grep 'client intended to send too large body' /var/log/nginx/error.log
+```
 
 Проверить сертификаты Caddy:
 
