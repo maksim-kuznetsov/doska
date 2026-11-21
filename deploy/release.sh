@@ -36,7 +36,14 @@ compose() {
     docker compose -f "$COMPOSE_FILE" --project-directory "$COMPOSE_DIR" "$@"
 }
 
-domain="$(grep -E '^DOMAIN=' "$ROOT_DIR/.env" | tail -n1 | cut -d= -f2- | tr -d '\r' || true)"
+# Публичный адрес для проверки здоровья: App__PublicBaseUrl (может содержать порт),
+# иначе — https://<DOMAIN>.
+public_base="$(grep -E '^App__PublicBaseUrl=' "$ROOT_DIR/.env" | tail -n1 | cut -d= -f2- | tr -d '\r' || true)"
+if [[ -z "$public_base" ]]; then
+    domain="$(grep -E '^DOMAIN=' "$ROOT_DIR/.env" | tail -n1 | cut -d= -f2- | tr -d '\r' || true)"
+    [[ -n "$domain" ]] && public_base="https://$domain"
+fi
+health_url="${public_base%/}/api/health"
 
 wait_api_healthy() {
     local deadline=$((SECONDS + HEALTH_TIMEOUT)) cid status
@@ -98,11 +105,11 @@ if ! wait_api_healthy; then
 fi
 echo "API здоров."
 
-if [[ -n "$domain" ]]; then
-    if curl -fsS "https://$domain/api/health" >/dev/null; then
-        echo "Проверка https://$domain/api/health пройдена."
+if [[ -n "$public_base" ]]; then
+    if curl -fsS "$health_url" >/dev/null; then
+        echo "Проверка $health_url пройдена."
     else
-        echo "Предупреждение: https://$domain/api/health не отвечает, проверьте вручную." >&2
+        echo "Предупреждение: $health_url не отвечает, проверьте вручную." >&2
     fi
 fi
 
