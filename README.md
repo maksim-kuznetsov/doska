@@ -211,7 +211,7 @@ ssh "$DOSKA_PROD_SSH" 'cd /srv/doska && bash deploy/release.sh'
 
 Режим задаётся настройкой `Email:Mode`:
 
-- `File` — файлы в `Email:OutboxPath` (по умолчанию `media/outbox`); режим Development по умолчанию.
+- `File` — файлы в `Email:OutboxPath` (по умолчанию `media/outbox`); режим по умолчанию в Development и Production.
 - `Log` — письма пишутся в журнал API.
 - `Smtp` — реальная отправка; требует `Email:Host`, иначе приложение не стартует.
 
@@ -238,13 +238,15 @@ dotnet run --project backend/src/Doska.Api
 Когда появятся креды, задайте `Email__Mode=Smtp`, `Email__Host`, `Email__Port`, `Email__UserName`,
 `Email__Password`, `Email__From` (в `.env` при развёртывании). Код и тесты при этом не меняются.
 
-### Временный режим File в production
+### Файловый режим в production
 
-Пока SMTP не настроен, на боевом стенде можно временно включить `Email__Mode=File`: письма
-сохраняются в `Email__OutboxPath` (bind-mount `./outbox` → `/srv/doska/outbox`), а администратор
-читает их в разделе «Письма (outbox)» и вручную передаёт ссылку подтверждения или причину решения.
-Как только появятся SMTP-креды, верните `Email__Mode=Smtp`. Подробности и очистка каталога — в
-`deploy/DEPLOY.md`, раздел «Почта в production».
+Пока домен отправителя не подтверждён у провайдера, на боевом стенде работает `Email__Mode=File`:
+письма сохраняются в `Email__OutboxPath` (bind-mount `./outbox` → `/srv/doska/outbox`), а
+администратор читает их в разделе «Письма (outbox)» и вручную передаёт ссылку подтверждения или
+причину решения. Это режим по умолчанию в `.env.example` и `docker-compose.prod.yml`.
+
+Когда домен подтверждён, заполните SMTP-параметры, верните `Email__Mode=Smtp` и пересоздайте API.
+Подробности и очистка каталога — в `deploy/DEPLOY.md`, раздел «Почта в production».
 
 ## Откат релиза
 
