@@ -777,59 +777,6 @@
   flex: none;
 }
 
-/* Блок разделов плитками */
-.category-tiles {
-  display: grid;
-  gap: var(--space-4);
-}
-
-.category-tiles__title {
-  font-size: var(--font-size-xl);
-}
-
-.category-tiles__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--grid-column-min), 1fr));
-  gap: var(--grid-gap);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.category-tile {
-  display: grid;
-  gap: var(--space-2);
-  align-content: start;
-  padding: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
-}
-
-.category-tile__head {
-  color: var(--color-text);
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-bold);
-}
-
-.category-tile__head:hover {
-  color: var(--color-primary-active);
-  text-decoration: none;
-}
-
-.category-tile__links {
-  display: grid;
-  gap: var(--space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.category-tile__link {
-  font-size: var(--font-size-sm);
-}
-
 /* Поиск */
 .search-bar {
   display: flex;

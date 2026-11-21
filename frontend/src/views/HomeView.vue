@@ -17,7 +17,6 @@ import {
   type FeedFilters,
 } from '../api/search'
 import AppMessage from '../components/AppMessage.vue'
-import CategoryTiles from '../components/CategoryTiles.vue'
 import EmptyState from '../components/EmptyState.vue'
 import FilterPanel from '../components/FilterPanel.vue'
 import ItemCard from '../components/ItemCard.vue'
@@ -118,8 +117,6 @@ onMounted(async () => {
     </div>
 
     <PromoBanner />
-
-    <CategoryTiles :sections="sections" />
 
     <FilterPanel
       :query="filters.query"

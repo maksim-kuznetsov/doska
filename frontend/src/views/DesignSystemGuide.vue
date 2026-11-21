@@ -14,7 +14,6 @@ import AppMessage from '../components/AppMessage.vue'
 import Breadcrumbs from '../components/Breadcrumbs.vue'
 import CategoryMenu from '../components/CategoryMenu.vue'
 import CategoryStrip from '../components/CategoryStrip.vue'
-import CategoryTiles from '../components/CategoryTiles.vue'
 import CitySelect from '../components/CitySelect.vue'
 import EmptyState from '../components/EmptyState.vue'
 import FilterPanel from '../components/FilterPanel.vue'
@@ -179,7 +178,6 @@ const guideErrors = [
         <CitySelect :model-value="guideFields.city" :cities="cities" />
       </div>
       <CategoryStrip :sections="sections" />
-      <CategoryTiles :sections="sections" />
     </div>
 
     <div class="guide__section">
