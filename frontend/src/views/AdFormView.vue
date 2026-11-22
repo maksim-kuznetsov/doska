@@ -151,6 +151,7 @@ async function submit(): Promise<void> {
                 input-id="ad-price"
                 type="number"
                 min="0"
+                max="9999999999"
                 step="1"
                 required
               />

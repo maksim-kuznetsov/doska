@@ -113,6 +113,38 @@ public sealed class ClassifiedAdsApiTests : IClassFixture<ApiFactory>, IAsyncLif
     }
 
     [Fact]
+    public async Task Create_rejects_price_above_database_range()
+    {
+        await EnsureDatabaseAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        using var author = _factory.CreateClient();
+        await RegisterAuthorAsync(author, ct);
+        var (cityId, categoryId) = await CreateCatalogAsync();
+
+        using (var tooExpensive = BuildForm(
+                   $"{AdPrefix}Слишком дорогое",
+                   cityId,
+                   categoryId,
+                   AdService.MaxPrice + 1m))
+        {
+            AddPhoto(tooExpensive, TestImage, "image/png", "photo.png");
+            var response = await author.PostContentAsync("/api/ads", tooExpensive, ct);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var body = await response.Content.ReadAsStringAsync(ct);
+            Assert.Contains("9 999 999 999", body);
+        }
+
+        using var atLimit = BuildForm($"{AdPrefix}На пределе", cityId, categoryId, AdService.MaxPrice);
+        AddPhoto(atLimit, TestImage, "image/png", "photo.png");
+        var created = await author.PostContentAsync("/api/ads", atLimit, ct);
+        var ad = await ReadCreatedAsync(created, ct);
+
+        Assert.Equal(AdService.MaxPrice, ad.Price);
+    }
+
+    [Fact]
     public async Task Create_accepts_photo_near_three_megabytes()
     {
         await EnsureDatabaseAsync();
@@ -561,12 +593,16 @@ public sealed class ClassifiedAdsApiTests : IClassFixture<ApiFactory>, IAsyncLif
         return await client.PostContentAsync("/api/ads", content, cancellationToken);
     }
 
-    private static MultipartFormDataContent BuildForm(string title, Guid cityId, Guid categoryId)
+    private static MultipartFormDataContent BuildForm(
+        string title,
+        Guid cityId,
+        Guid categoryId,
+        decimal price = 1000m)
         => new()
         {
             { new StringContent(title), "title" },
             { new StringContent("Описание объявления"), "description" },
-            { new StringContent(1000m.ToString(CultureInfo.InvariantCulture)), "price" },
+            { new StringContent(price.ToString(CultureInfo.InvariantCulture)), "price" },
             { new StringContent(cityId.ToString()), "cityId" },
             { new StringContent(categoryId.ToString()), "categoryId" },
             { new StringContent("+7 900 000-00-00"), "contacts" },
@@ -641,6 +677,7 @@ public sealed class ClassifiedAdsApiTests : IClassFixture<ApiFactory>, IAsyncLif
     private sealed record AdPayload(
         Guid Id,
         string Title,
+        decimal Price,
         string Status,
         string? ModerationReason,
         List<PhotoPayload> Photos);

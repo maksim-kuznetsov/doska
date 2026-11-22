@@ -60,6 +60,9 @@ public sealed class AdService(
     /// <summary>Максимальный размер фотографии в байтах.</summary>
     public const long MaxPhotoBytes = 5 * 1024 * 1024;
 
+    /// <summary>Максимальная цена: предел колонки <c>numeric(12,2)</c>.</summary>
+    public const decimal MaxPrice = 9_999_999_999.99m;
+
     private const int MaxTitleLength = 200;
     private const int MaxContactsLength = 500;
 
@@ -420,6 +423,13 @@ public sealed class AdService(
         if (command.Price < 0)
         {
             throw new ServiceException(ServiceErrorKind.Validation, "Цена должна быть неотрицательным числом.");
+        }
+
+        if (command.Price > MaxPrice)
+        {
+            throw new ServiceException(
+                ServiceErrorKind.Validation,
+                "Цена не должна превышать 9 999 999 999,99 ₽.");
         }
 
         if (string.IsNullOrWhiteSpace(command.Contacts) || command.Contacts.Trim().Length > MaxContactsLength)
