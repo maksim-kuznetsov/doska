@@ -35,16 +35,32 @@ function toggle(): void {
   open.value = !open.value
 }
 
-function onPointerEnter(): void {
+function isMousePointer(event: PointerEvent): boolean {
+  return event.pointerType === 'mouse'
+}
+
+function onPointerEnter(event: PointerEvent): void {
+  if (!isMousePointer(event)) {
+    return
+  }
+
   cancelClose()
   open.value = true
 }
 
-function onPointerLeave(): void {
+function onPointerLeave(event: PointerEvent): void {
+  if (!isMousePointer(event)) {
+    return
+  }
+
   cancelClose()
   closeTimer = setTimeout(() => {
     open.value = false
   }, props.closeDelay)
+}
+
+function onPointerDown(): void {
+  cancelClose()
 }
 
 function onDocumentPointerDown(event: PointerEvent): void {
@@ -78,6 +94,7 @@ onBeforeUnmount(() => {
     :class="{ 'dropdown--end': align === 'end' }"
     @pointerenter="onPointerEnter"
     @pointerleave="onPointerLeave"
+    @pointerdown="onPointerDown"
   >
     <slot name="trigger" :open="open" :toggle="toggle" :close="close" />
     <div v-if="open" :id="panelId" class="dropdown__panel">

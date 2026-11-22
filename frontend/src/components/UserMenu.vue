@@ -11,6 +11,11 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{ (event: 'logout'): void }>()
+
+function logout(close: () => void): void {
+  close()
+  emit('logout')
+}
 </script>
 
 <template>
@@ -60,7 +65,7 @@ const emit = defineEmits<{ (event: 'logout'): void }>()
 
       <hr class="dropdown__divider" />
       <div class="dropdown__group">
-        <button type="button" class="dropdown__item" @click="emit('logout')">Выйти</button>
+        <button type="button" class="dropdown__item" @click="logout(close)">Выйти</button>
       </div>
     </template>
   </DropdownMenu>

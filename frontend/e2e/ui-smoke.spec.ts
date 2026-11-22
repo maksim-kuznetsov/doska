@@ -61,3 +61,32 @@ test('недоступное объявление показывает пуст�
   await expect(page.getByText('Объявление недоступно')).toBeVisible()
   await expect(page.getByRole('link', { name: 'На главную' })).toBeVisible()
 })
+
+test.describe('мобильные меню шапки', () => {
+  test.use({ hasTouch: true, viewport: { width: 390, height: 844 } })
+
+  test('меню категорий открывается и закрывается касанием', async ({ page }) => {
+    await page.goto('/')
+
+    const trigger = page.getByRole('button', { name: 'Категории' })
+    await trigger.tap()
+    await expect(page.locator('#category-tree-panel')).toBeVisible()
+
+    await trigger.tap()
+    await expect(page.locator('#category-tree-panel')).toBeHidden()
+  })
+
+  test('касание меню пользователя закрывает меню категорий', async ({ page }) => {
+    await login(page, 'admin@example.com')
+
+    const categories = page.getByRole('button', { name: 'Категории' })
+    const userMenu = page.getByRole('button', { name: /admin@example\.com/ })
+
+    await categories.tap()
+    await expect(page.locator('#category-tree-panel')).toBeVisible()
+
+    await userMenu.tap()
+    await expect(page.locator('#category-tree-panel')).toBeHidden()
+    await expect(page.locator('#user-menu-panel')).toBeVisible()
+  })
+})
