@@ -2,24 +2,10 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { createInstallPromptEvent } from '../../__tests__/helpers/pwa'
 import PwaInstallPrompt from '../PwaInstallPrompt.vue'
 import PwaUpdatePrompt from '../PwaUpdatePrompt.vue'
-import { usePwaStore, type BeforeInstallPromptEvent } from '../../stores/pwa'
-
-function createInstallPromptEvent(): BeforeInstallPromptEvent {
-  const prompt = vi.fn().mockResolvedValue(undefined)
-  const event = new Event('beforeinstallprompt')
-
-  Object.defineProperties(event, {
-    prompt: { value: prompt },
-    userChoice: {
-      value: Promise.resolve({ outcome: 'accepted', platform: 'web' }),
-    },
-    platforms: { value: ['web'] },
-  })
-
-  return event as unknown as BeforeInstallPromptEvent
-}
+import { usePwaStore } from '../../stores/pwa'
 
 function buttonByText(wrapper: ReturnType<typeof mount>, text: string) {
   return wrapper.findAll('button').find((button) => button.text() === text)

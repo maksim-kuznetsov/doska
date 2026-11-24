@@ -1,37 +1,35 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import type { RouteRecordRaw } from 'vue-router'
+
+import { createApiClientMock } from '../../__tests__/helpers/apiClientMock'
+import { mountWithRouter } from '../../__tests__/helpers/mount'
 
 const { resetPassword } = vi.hoisted(() => ({ resetPassword: vi.fn() }))
 
-vi.mock('../../api/client', () => ({
-  ApiError: class ApiError extends Error {
-    readonly status = 0
-  },
-  api: {
+vi.mock('../../api/client', () =>
+  createApiClientMock({
     auth: {
       resetPassword: (token: string, password: string) => resetPassword(token, password),
     },
-  },
-}))
+  }),
+)
 
 import ResetPasswordView from '../ResetPasswordView.vue'
 
+const routes: RouteRecordRaw[] = [
+  { path: '/', name: 'home', component: { template: '<div />' } },
+  { path: '/login', name: 'login', component: { template: '<div />' } },
+  { path: '/forgot-password', name: 'forgot-password', component: { template: '<div />' } },
+  { path: '/reset-password', name: 'reset-password', component: ResetPasswordView },
+]
+
 async function mountView(token: string) {
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [
-      { path: '/', name: 'home', component: { template: '<div />' } },
-      { path: '/login', name: 'login', component: { template: '<div />' } },
-      { path: '/forgot-password', name: 'forgot-password', component: { template: '<div />' } },
-      { path: '/reset-password', name: 'reset-password', component: ResetPasswordView },
-    ],
+  return mountWithRouter({
+    component: ResetPasswordView,
+    routes,
+    path: `/reset-password?token=${token}`,
   })
-
-  await router.push(`/reset-password?token=${token}`)
-  await router.isReady()
-
-  return mount(ResetPasswordView, { global: { plugins: [router] } })
 }
 
 describe('ResetPasswordView', () => {

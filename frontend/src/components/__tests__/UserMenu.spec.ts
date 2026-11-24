@@ -1,21 +1,17 @@
-import { mount } from '@vue/test-utils'
-import { createMemoryHistory, createRouter } from 'vue-router'
 import { describe, expect, it } from 'vitest'
+import type { RouteRecordRaw } from 'vue-router'
 
+import { mountWithRouter } from '../../__tests__/helpers/mount'
 import UserMenu from '../UserMenu.vue'
 
+const routes: RouteRecordRaw[] = [{ path: '/', name: 'home', component: { template: '<div />' } }]
+
 async function mountMenu() {
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [{ path: '/', name: 'home', component: { template: '<div />' } }],
-  })
-
-  await router.push('/')
-  await router.isReady()
-
-  return mount(UserMenu, {
+  return mountWithRouter({
+    component: UserMenu,
+    routes,
+    path: '/',
     props: { email: 'admin@example.com', canModerate: true, isAdmin: true },
-    global: { plugins: [router] },
   })
 }
 

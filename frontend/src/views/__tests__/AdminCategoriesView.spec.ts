@@ -1,13 +1,12 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 
+import { createApiClientMock } from '../../__tests__/helpers/apiClientMock'
+
 const { tree } = vi.hoisted(() => ({ tree: vi.fn() }))
 
-vi.mock('../../api/client', () => ({
-  ApiError: class ApiError extends Error {
-    readonly status = 0
-  },
-  api: {
+vi.mock('../../api/client', () =>
+  createApiClientMock({
     adminCategories: {
       tree: () => tree(),
       createSection: vi.fn(),
@@ -16,8 +15,8 @@ vi.mock('../../api/client', () => ({
       setActive: vi.fn(),
       remove: vi.fn(),
     },
-  },
-}))
+  }),
+)
 
 import router from '../../router'
 import AdminCategoriesView from '../AdminCategoriesView.vue'

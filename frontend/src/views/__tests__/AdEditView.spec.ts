@@ -1,6 +1,9 @@
-import { flushPromises, mount } from '@vue/test-utils'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { RouteRecordRaw } from 'vue-router'
+
+import { createApiClientMock } from '../../__tests__/helpers/apiClientMock'
+import { mountWithRouter } from '../../__tests__/helpers/mount'
 
 const { get, cities, sections } = vi.hoisted(() => ({
   get: vi.fn(),
@@ -8,32 +11,27 @@ const { get, cities, sections } = vi.hoisted(() => ({
   sections: vi.fn(),
 }))
 
-vi.mock('../../api/client', () => ({
-  ApiError: class ApiError extends Error {
-    readonly status = 0
-  },
-  api: {
+vi.mock('../../api/client', () =>
+  createApiClientMock({
     ads: { get: (id: string) => get(id), update: vi.fn() },
     catalog: { cities: () => cities(), sections: () => sections() },
-  },
-}))
+  }),
+)
 
 import AdEditView from '../AdEditView.vue'
 
+const routes: RouteRecordRaw[] = [
+  { path: '/', name: 'home', component: { template: '<div />' } },
+  { path: '/ads/mine', name: 'ads-mine', component: { template: '<div />' } },
+  { path: '/ads/:id/edit', name: 'ad-edit', component: AdEditView },
+]
+
 async function mountView() {
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [
-      { path: '/', name: 'home', component: { template: '<div />' } },
-      { path: '/ads/mine', name: 'ads-mine', component: { template: '<div />' } },
-      { path: '/ads/:id/edit', name: 'ad-edit', component: AdEditView },
-    ],
+  return mountWithRouter({
+    component: AdEditView,
+    routes,
+    path: '/ads/ad-1/edit',
   })
-
-  await router.push('/ads/ad-1/edit')
-  await router.isReady()
-
-  return mount(AdEditView, { global: { plugins: [router] } })
 }
 
 describe('AdEditView', () => {

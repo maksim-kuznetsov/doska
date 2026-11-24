@@ -1,13 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
-
-function read(relativePath: string): string {
-  return readFileSync(resolve(repoRoot, relativePath), 'utf8')
-}
+import { read, repoRoot } from './helpers/repo'
 
 function pngSize(relativePath: string): { width: number; height: number } {
   const buffer = readFileSync(resolve(repoRoot, relativePath))

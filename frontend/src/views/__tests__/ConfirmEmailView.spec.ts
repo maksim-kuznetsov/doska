@@ -1,47 +1,40 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import type { RouteRecordRaw } from 'vue-router'
+
+import { createApiClientMock } from '../../__tests__/helpers/apiClientMock'
+import { mountWithRouter } from '../../__tests__/helpers/mount'
 
 const { confirmEmail } = vi.hoisted(() => ({ confirmEmail: vi.fn() }))
 
-vi.mock('../../api/client', () => ({
-  ApiError: class ApiError extends Error {
-    readonly status: number
-
-    constructor(status: number, message: string) {
-      super(message)
-      this.status = status
-    }
-  },
-  api: {
+vi.mock('../../api/client', () =>
+  createApiClientMock({
     auth: {
       confirmEmail: (token: string) => confirmEmail(token),
     },
-  },
-}))
+  }),
+)
 
 import { ApiError } from '../../api/client'
 import ConfirmEmailView from '../ConfirmEmailView.vue'
 
+const routes: RouteRecordRaw[] = [
+  { path: '/', name: 'home', component: { template: '<div />' } },
+  { path: '/ads/mine', name: 'ads-mine', component: { template: '<div />' } },
+  {
+    path: '/resend-confirmation',
+    name: 'resend-confirmation',
+    component: { template: '<div />' },
+  },
+  { path: '/confirm-email', name: 'confirm-email', component: ConfirmEmailView },
+]
+
 async function mountView(token: string) {
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [
-      { path: '/', name: 'home', component: { template: '<div />' } },
-      { path: '/ads/mine', name: 'ads-mine', component: { template: '<div />' } },
-      {
-        path: '/resend-confirmation',
-        name: 'resend-confirmation',
-        component: { template: '<div />' },
-      },
-      { path: '/confirm-email', name: 'confirm-email', component: ConfirmEmailView },
-    ],
+  return mountWithRouter({
+    component: ConfirmEmailView,
+    routes,
+    path: `/confirm-email?token=${token}`,
   })
-
-  await router.push(`/confirm-email?token=${token}`)
-  await router.isReady()
-
-  return mount(ConfirmEmailView, { global: { plugins: [router] } })
 }
 
 describe('ConfirmEmailView', () => {

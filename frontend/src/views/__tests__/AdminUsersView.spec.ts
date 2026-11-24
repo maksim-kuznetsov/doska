@@ -1,13 +1,12 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { createApiClientMock } from '../../__tests__/helpers/apiClientMock'
+
 const { list, setRole } = vi.hoisted(() => ({ list: vi.fn(), setRole: vi.fn() }))
 
-vi.mock('../../api/client', () => ({
-  ApiError: class ApiError extends Error {
-    readonly status = 0
-  },
-  api: {
+vi.mock('../../api/client', () =>
+  createApiClientMock({
     adminUsers: {
       list: () => list(),
       setRole: (id: string, role: string) => setRole(id, role),
@@ -16,8 +15,8 @@ vi.mock('../../api/client', () => ({
       block: vi.fn(),
       unblock: vi.fn(),
     },
-  },
-}))
+  }),
+)
 
 import router from '../../router'
 import AdminUsersView from '../AdminUsersView.vue'

@@ -1,13 +1,6 @@
-import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
-
-function read(relativePath: string): string {
-  return readFileSync(resolve(repoRoot, relativePath), 'utf8')
-}
+import { read } from './helpers/repo'
 
 describe('Версионирование и кеширование статики', () => {
   it('отдаёт HTML-оболочку без кеширования', () => {

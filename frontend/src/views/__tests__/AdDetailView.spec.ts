@@ -1,6 +1,9 @@
-import { flushPromises, mount } from '@vue/test-utils'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { RouteRecordRaw } from 'vue-router'
+
+import { createApiClientMock } from '../../__tests__/helpers/apiClientMock'
+import { mountWithRouter } from '../../__tests__/helpers/mount'
 
 const { get, cities, sections } = vi.hoisted(() => ({
   get: vi.fn(),
@@ -8,20 +11,12 @@ const { get, cities, sections } = vi.hoisted(() => ({
   sections: vi.fn(),
 }))
 
-vi.mock('../../api/client', () => ({
-  ApiError: class ApiError extends Error {
-    readonly status: number
-
-    constructor(status: number, message: string) {
-      super(message)
-      this.status = status
-    }
-  },
-  api: {
+vi.mock('../../api/client', () =>
+  createApiClientMock({
     ads: { get: (id: string) => get(id) },
     catalog: { cities: () => cities(), sections: () => sections() },
-  },
-}))
+  }),
+)
 
 import { ApiError } from '../../api/client'
 import AdDetailView from '../AdDetailView.vue'
@@ -52,19 +47,17 @@ const activeAd = {
   ],
 }
 
+const routes: RouteRecordRaw[] = [
+  { path: '/', name: 'home', component: { template: '<div />' } },
+  { path: '/ads/:id', name: 'item-detail', component: AdDetailView },
+]
+
 async function mountView() {
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [
-      { path: '/', name: 'home', component: { template: '<div />' } },
-      { path: '/ads/:id', name: 'item-detail', component: AdDetailView },
-    ],
+  return mountWithRouter({
+    component: AdDetailView,
+    routes,
+    path: '/ads/ad-1',
   })
-
-  await router.push('/ads/ad-1')
-  await router.isReady()
-
-  return mount(AdDetailView, { global: { plugins: [router] } })
 }
 
 describe('AdDetailView', () => {

@@ -1,30 +1,35 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import type { RouteRecordRaw } from 'vue-router'
+
+import { createApiClientMock } from '../../__tests__/helpers/apiClientMock'
+import { mountWithRouter } from '../../__tests__/helpers/mount'
 
 const { resendConfirmation } = vi.hoisted(() => ({ resendConfirmation: vi.fn() }))
 
-vi.mock('../../api/client', () => ({
-  ApiError: class ApiError extends Error {
-    readonly status: number
-
-    constructor(status: number, message: string) {
-      super(message)
-      this.status = status
-    }
-  },
-  api: {
+vi.mock('../../api/client', () =>
+  createApiClientMock({
     auth: {
       me: () => Promise.resolve(null),
       resendConfirmation: (email: string) => resendConfirmation(email),
     },
-  },
-}))
+  }),
+)
 
 import { ApiError } from '../../api/client'
 import { useAuthStore } from '../../stores/auth'
 import ResendConfirmationView from '../ResendConfirmationView.vue'
+
+const routes: RouteRecordRaw[] = [
+  { path: '/', name: 'home', component: { template: '<div />' } },
+  { path: '/login', name: 'login', component: { template: '<div />' } },
+  {
+    path: '/resend-confirmation',
+    name: 'resend-confirmation',
+    component: ResendConfirmationView,
+  },
+]
 
 async function mountView(userEmail?: string) {
   const pinia = createPinia()
@@ -41,23 +46,12 @@ async function mountView(userEmail?: string) {
     }
   }
 
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [
-      { path: '/', name: 'home', component: { template: '<div />' } },
-      { path: '/login', name: 'login', component: { template: '<div />' } },
-      {
-        path: '/resend-confirmation',
-        name: 'resend-confirmation',
-        component: ResendConfirmationView,
-      },
-    ],
+  const wrapper = await mountWithRouter({
+    component: ResendConfirmationView,
+    routes,
+    path: '/resend-confirmation',
+    plugins: [pinia],
   })
-
-  await router.push('/resend-confirmation')
-  await router.isReady()
-
-  const wrapper = mount(ResendConfirmationView, { global: { plugins: [pinia, router] } })
 
   return { wrapper, auth }
 }

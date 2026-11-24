@@ -1,7 +1,7 @@
-import { mount } from '@vue/test-utils'
-import { createMemoryHistory, createRouter } from 'vue-router'
 import { describe, expect, it } from 'vitest'
+import type { RouteRecordRaw } from 'vue-router'
 
+import { mountWithRouter } from '../../__tests__/helpers/mount'
 import CategoryMenu from '../CategoryMenu.vue'
 
 const sections = [
@@ -20,18 +20,14 @@ const sections = [
   },
 ]
 
+const routes: RouteRecordRaw[] = [{ path: '/', name: 'home', component: { template: '<div />' } }]
+
 async function mountMenu(items = sections) {
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [{ path: '/', name: 'home', component: { template: '<div />' } }],
-  })
-
-  await router.push('/')
-  await router.isReady()
-
-  return mount(CategoryMenu, {
+  return mountWithRouter({
+    component: CategoryMenu,
+    routes,
+    path: '/',
     props: { sections: items },
-    global: { plugins: [router] },
   })
 }
 

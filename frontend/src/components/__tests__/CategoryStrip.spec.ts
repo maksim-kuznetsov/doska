@@ -1,7 +1,7 @@
-import { mount } from '@vue/test-utils'
-import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { RouteRecordRaw } from 'vue-router'
 
+import { mountWithRouter } from '../../__tests__/helpers/mount'
 import CategoryStrip from '../CategoryStrip.vue'
 
 const sections = [
@@ -9,18 +9,14 @@ const sections = [
   { id: 's2', name: 'Недвижимость', subsections: [] },
 ]
 
+const routes: RouteRecordRaw[] = [{ path: '/', name: 'home', component: { template: '<div />' } }]
+
 async function mountStrip(items = sections) {
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [{ path: '/', name: 'home', component: { template: '<div />' } }],
-  })
-
-  await router.push('/')
-  await router.isReady()
-
-  return mount(CategoryStrip, {
+  return mountWithRouter({
+    component: CategoryStrip,
+    routes,
+    path: '/',
     props: { sections: items },
-    global: { plugins: [router] },
   })
 }
 

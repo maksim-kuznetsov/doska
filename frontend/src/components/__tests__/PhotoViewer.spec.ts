@@ -1,38 +1,20 @@
 import { mount } from '@vue/test-utils'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import type { AdPhotoSummary } from '../../api/client'
+import { stubDialogElement } from '../../__tests__/helpers/dialog'
+import { photo } from '../../__tests__/helpers/photo'
 import PhotoViewer from '../PhotoViewer.vue'
-
-function photo(order: number): AdPhotoSummary {
-  return {
-    id: `photo-${order}`,
-    url: `/api/media/ad-1/photo-${order}.png`,
-    thumbnailUrl: `/api/media/ad-1/photo-${order}_thumb.jpg`,
-    contentType: 'image/png',
-    byteSize: 128,
-    width: 800,
-    height: 600,
-    sortOrder: order,
-  }
-}
 
 const photos = [photo(1), photo(2), photo(3)]
 
-type DialogPrototype = { showModal?: () => void; close?: () => void }
-const dialogProto = HTMLDialogElement.prototype as unknown as DialogPrototype
-
-let showModal: ReturnType<typeof vi.fn>
+let dialog: ReturnType<typeof stubDialogElement>
 
 beforeEach(() => {
-  showModal = vi.fn()
-  dialogProto.showModal = showModal as unknown as () => void
-  dialogProto.close = vi.fn()
+  dialog = stubDialogElement()
 })
 
 afterEach(() => {
-  delete dialogProto.showModal
-  delete dialogProto.close
+  dialog.restore()
   document.body.querySelectorAll('.viewer-host').forEach((node) => node.remove())
 })
 
@@ -40,7 +22,7 @@ describe('PhotoViewer', () => {
   it('открывается как модальный диалог с названием', () => {
     const wrapper = mount(PhotoViewer, { props: { photos, startIndex: 0 } })
 
-    expect(showModal).toHaveBeenCalledOnce()
+    expect(dialog.showModal).toHaveBeenCalledOnce()
     expect(wrapper.find('dialog').exists()).toBe(true)
     expect(wrapper.find('dialog').attributes('aria-label')).toContain('Просмотр фотографий')
   })

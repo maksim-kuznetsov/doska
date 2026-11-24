@@ -1,13 +1,12 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { createApiClientMock } from '../../__tests__/helpers/apiClientMock'
+
 const { list } = vi.hoisted(() => ({ list: vi.fn() }))
 
-vi.mock('../../api/client', () => ({
-  ApiError: class ApiError extends Error {
-    readonly status = 0
-  },
-  api: {
+vi.mock('../../api/client', () =>
+  createApiClientMock({
     adminCities: {
       list: () => list(),
       create: vi.fn(),
@@ -15,8 +14,8 @@ vi.mock('../../api/client', () => ({
       setActive: vi.fn(),
       remove: vi.fn(),
     },
-  },
-}))
+  }),
+)
 
 import router from '../../router'
 import AdminCitiesView from '../AdminCitiesView.vue'

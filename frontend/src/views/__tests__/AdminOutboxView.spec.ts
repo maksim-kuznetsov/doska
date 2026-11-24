@@ -1,19 +1,18 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { createApiClientMock } from '../../__tests__/helpers/apiClientMock'
+
 const { list, read } = vi.hoisted(() => ({ list: vi.fn(), read: vi.fn() }))
 
-vi.mock('../../api/client', () => ({
-  ApiError: class ApiError extends Error {
-    readonly status = 0
-  },
-  api: {
+vi.mock('../../api/client', () =>
+  createApiClientMock({
     adminOutbox: {
       list: () => list(),
       read: (fileName: string) => read(fileName),
     },
-  },
-}))
+  }),
+)
 
 import router from '../../router'
 import AdminOutboxView from '../AdminOutboxView.vue'

@@ -1,22 +1,20 @@
-import { mount } from '@vue/test-utils'
-import { createMemoryHistory, createRouter } from 'vue-router'
 import { describe, expect, it } from 'vitest'
+import type { RouteRecordRaw } from 'vue-router'
 
+import { mountWithRouter } from '../../__tests__/helpers/mount'
 import PromoBanner from '../PromoBanner.vue'
 
+const routes: RouteRecordRaw[] = [
+  { path: '/', name: 'home', component: { template: '<div />' } },
+  { path: '/ads/new', name: 'ad-new', component: { template: '<div />' } },
+]
+
 async function mountBanner() {
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [
-      { path: '/', name: 'home', component: { template: '<div />' } },
-      { path: '/ads/new', name: 'ad-new', component: { template: '<div />' } },
-    ],
+  return mountWithRouter({
+    component: PromoBanner,
+    routes,
+    path: '/',
   })
-
-  await router.push('/')
-  await router.isReady()
-
-  return mount(PromoBanner, { global: { plugins: [router] } })
 }
 
 describe('PromoBanner', () => {

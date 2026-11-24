@@ -1,7 +1,7 @@
-import { mount } from '@vue/test-utils'
-import { createMemoryHistory, createRouter } from 'vue-router'
 import { describe, expect, it } from 'vitest'
+import type { RouteRecordRaw } from 'vue-router'
 
+import { mountWithRouter } from '../../__tests__/helpers/mount'
 import ItemCard from '../ItemCard.vue'
 
 const ad = {
@@ -16,19 +16,18 @@ const ad = {
   thumbnailUrl: null,
 }
 
+const routes: RouteRecordRaw[] = [
+  { path: '/', name: 'home', component: { template: '<div />' } },
+  { path: '/ads/:id', name: 'item-detail', component: { template: '<div />' } },
+]
+
 async function mountCard() {
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [
-      { path: '/', name: 'home', component: { template: '<div />' } },
-      { path: '/ads/:id', name: 'item-detail', component: { template: '<div />' } },
-    ],
+  return mountWithRouter({
+    component: ItemCard,
+    routes,
+    path: '/',
+    props: { ad },
   })
-
-  await router.push('/')
-  await router.isReady()
-
-  return mount(ItemCard, { props: { ad }, global: { plugins: [router] } })
 }
 
 describe('ItemCard', () => {

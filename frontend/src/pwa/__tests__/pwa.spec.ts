@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 
+import { createInstallPromptEvent } from '../../__tests__/helpers/pwa'
 import DefaultLayout from '../../layouts/DefaultLayout.vue'
 import OfflineApp from '../OfflineApp.vue'
 import {
@@ -11,7 +12,7 @@ import {
   isStandaloneMode,
   shouldRegisterServiceWorker,
 } from '../environment'
-import { usePwaStore, type BeforeInstallPromptEvent } from '../../stores/pwa'
+import { usePwaStore } from '../../stores/pwa'
 
 vi.mock('../../components/SiteHeader.vue', () => ({
   default: { name: 'SiteHeader', template: '<header />' },
@@ -20,23 +21,6 @@ vi.mock('../../components/SiteHeader.vue', () => ({
 vi.mock('../../components/SiteFooter.vue', () => ({
   default: { name: 'SiteFooter', template: '<footer />' },
 }))
-
-function createInstallPromptEvent(
-  outcome: 'accepted' | 'dismissed' = 'accepted',
-): BeforeInstallPromptEvent {
-  const prompt = vi.fn().mockResolvedValue(undefined)
-  const event = new Event('beforeinstallprompt')
-
-  Object.defineProperties(event, {
-    prompt: { value: prompt },
-    userChoice: {
-      value: Promise.resolve({ outcome, platform: 'web' }),
-    },
-    platforms: { value: ['web'] },
-  })
-
-  return event as unknown as BeforeInstallPromptEvent
-}
 
 describe('Окружение PWA', () => {
   it('определяет iOS и iPadOS', () => {
