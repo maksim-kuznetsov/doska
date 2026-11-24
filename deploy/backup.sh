@@ -17,25 +17,10 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     exit 0
 fi
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-COMPOSE_FILE="${COMPOSE_FILE:-$ROOT_DIR/docker-compose.prod.yml}"
-COMPOSE_DIR="${COMPOSE_DIR:-$ROOT_DIR}"
+ENV_MISSING_SUFFIX=": параметры базы берутся из окружения compose."
+source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 BACKUP_DIR="${BACKUP_DIR:-$ROOT_DIR/backups}"
 BACKUP_KEEP_DAYS="${BACKUP_KEEP_DAYS:-14}"
-
-if [[ ! -f "$COMPOSE_FILE" ]]; then
-    echo "Не найден compose-файл: $COMPOSE_FILE" >&2
-    exit 1
-fi
-
-if [[ ! -f "$ROOT_DIR/.env" ]]; then
-    echo "Не найден $ROOT_DIR/.env: параметры базы берутся из окружения compose." >&2
-    exit 1
-fi
-
-compose() {
-    docker compose -f "$COMPOSE_FILE" --project-directory "$COMPOSE_DIR" "$@"
-}
 
 mkdir -p "$BACKUP_DIR"
 timestamp="$(date +%Y%m%d-%H%M%S)"

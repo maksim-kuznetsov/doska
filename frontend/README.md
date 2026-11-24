@@ -1,5 +1,53 @@
-# Vue 3 + TypeScript + Vite
+# Интерфейс доски объявлений (Vue 3 + TypeScript + Vite)
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+Одностраничное приложение: Vue 3 (Composition API), TypeScript, Vite и Pinia.
+Общее описание проекта, требования к окружению и запуск API с PostgreSQL — в
+[корневом README](../README.md).
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+## Запуск
+
+Dev-сервер с горячей заменой модулей. Запросы к `/api` проксируются на http://localhost:5000,
+поэтому API и PostgreSQL должны быть запущены из корня проекта.
+
+```bash
+pnpm dev
+```
+
+Адрес — http://localhost:5173.
+
+## Сборка и предпросмотр
+
+```bash
+pnpm build
+pnpm preview
+```
+
+`pnpm build` проверяет типы (`vue-tsc -b`) и собирает приложение Vite: файлы с хешем в имени и
+манифест попадают в `dist/`. `pnpm preview` поднимает собранную версию на http://localhost:4173.
+
+## Тесты
+
+```bash
+pnpm test
+```
+
+`pnpm test` запускает Vitest (`vitest run`). Тесты лежат рядом с проверяемым кодом в каталогах
+`__tests__` (`src/**/__tests__/*.spec.ts`) и проверяют компоненты и клиентские правила.
+
+Сквозной смоук в браузере (Playwright; нужны запущенные API, PostgreSQL и демо-данные — см.
+корневой README):
+
+```bash
+pnpm e2e
+```
+
+## PWA
+
+Приложение собирается как устанавливаемое: web-манифест, иконки, service worker и офлайн-оболочка.
+Service worker включается только в production-сборке и только в защищённом контексте — по HTTPS
+или на `localhost`; dev-сервер PWA не включает.
+
+- Иконки пересобираются из `public/pwa/logo.svg`: `pnpm pwa:assets`.
+- Проверка PWA-сборки (манифест и service worker): `pnpm check:pwa`.
+
+Подробности о PWA, развёртывании и обновлении — в корневом README и [`deploy/DEPLOY.md`](../deploy/DEPLOY.md).

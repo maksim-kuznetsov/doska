@@ -9,6 +9,7 @@
 frontend/dist
 .tmp
 .tools
+/outbox/
 /media
 backend/src/Doska.Api/media
 openspec

@@ -30,23 +30,8 @@ for file in "$DB_FILE" "$MEDIA_FILE"; do
     fi
 done
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-COMPOSE_FILE="${COMPOSE_FILE:-$ROOT_DIR/docker-compose.prod.yml}"
-COMPOSE_DIR="${COMPOSE_DIR:-$ROOT_DIR}"
-
-if [[ ! -f "$COMPOSE_FILE" ]]; then
-    echo "Не найден compose-файл: $COMPOSE_FILE" >&2
-    exit 1
-fi
-
-if [[ ! -f "$ROOT_DIR/.env" ]]; then
-    echo "Не найден $ROOT_DIR/.env." >&2
-    exit 1
-fi
-
-compose() {
-    docker compose -f "$COMPOSE_FILE" --project-directory "$COMPOSE_DIR" "$@"
-}
+ENV_MISSING_SUFFIX="."
+source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 
 echo "Восстановление перезапишет базу данных и медиафайлы."
 echo "  база:  $DB_FILE"
