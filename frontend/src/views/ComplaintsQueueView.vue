@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 
-import { ApiError, api, type ComplaintQueueItem } from '../api/client'
+import { api, type ComplaintQueueItem } from '../api/client'
+import { messageOf } from '../api/errors'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -19,7 +20,7 @@ async function load(): Promise<void> {
   try {
     complaints.value = await api.complaints.queue()
   } catch (cause) {
-    error.value = cause instanceof ApiError ? cause.message : 'Не удалось загрузить жалобы.'
+    error.value = messageOf(cause, 'Не удалось загрузить жалобы.')
   } finally {
     loading.value = false
   }
@@ -44,7 +45,7 @@ async function resolve(id: string, hideAd: boolean): Promise<void> {
       : 'Объявление оставлено, жалоба закрыта.'
     await load()
   } catch (cause) {
-    error.value = cause instanceof ApiError ? cause.message : 'Не удалось закрыть жалобу.'
+    error.value = messageOf(cause, 'Не удалось закрыть жалобу.')
   }
 }
 

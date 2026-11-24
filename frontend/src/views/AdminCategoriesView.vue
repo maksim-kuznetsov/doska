@@ -2,11 +2,11 @@
 import { onMounted, reactive, ref } from 'vue'
 
 import {
-  ApiError,
   api,
   type CategoryItemView,
   type CategorySectionView,
 } from '../api/client'
+import { messageOf } from '../api/errors'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
 import Breadcrumbs from '../components/Breadcrumbs.vue'
@@ -15,6 +15,7 @@ import FormGridItem from '../components/FormGridItem.vue'
 import FormSection from '../components/FormSection.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import TextField from '../components/TextField.vue'
+import { useApiAction } from '../composables/useApiAction'
 
 interface Draft {
   name: string
@@ -26,13 +27,8 @@ const drafts = ref<Record<string, Draft>>({})
 const newSubsections = reactive<Record<string, Draft>>({})
 const newSectionName = ref('')
 const newSectionOrder = ref('')
-const error = ref('')
-const notice = ref('')
+const { error, notice, run } = useApiAction(load)
 const loading = ref(false)
-
-function messageOf(cause: unknown, fallback: string): string {
-  return cause instanceof ApiError ? cause.message : fallback
-}
 
 function rebuildDrafts(): void {
   const next: Record<string, Draft> = {}
@@ -65,19 +61,6 @@ async function load(): Promise<void> {
   }
 }
 
-async function run(action: () => Promise<unknown>, success: string): Promise<void> {
-  error.value = ''
-  notice.value = ''
-
-  try {
-    await action()
-    notice.value = success
-    await load()
-  } catch (cause) {
-    error.value = messageOf(cause, 'Не удалось выполнить действие.')
-  }
-}
-
 function draftFor(id: string): Draft {
   return drafts.value[id] ?? { name: '', sortOrder: '' }
 }
@@ -93,7 +76,7 @@ function createSection(): void {
     await api.adminCategories.createSection(name, Number(newSectionOrder.value) || 0)
     newSectionName.value = ''
     newSectionOrder.value = ''
-  }, 'Раздел создан.')
+  }, 'Раздел создан.', 'Не удалось выполнить действие.')
 }
 
 function createSubsection(sectionId: string): void {
@@ -111,7 +94,7 @@ function createSubsection(sectionId: string): void {
     )
     draft.name = ''
     draft.sortOrder = ''
-  }, 'Подраздел создан.')
+  }, 'Подраздел создан.', 'Не удалось выполнить действие.')
 }
 
 function save(id: string): void {
@@ -119,6 +102,7 @@ function save(id: string): void {
   void run(
     () => api.adminCategories.update(id, draft.name.trim(), Number(draft.sortOrder) || 0),
     'Категория сохранена.',
+    'Не удалось выполнить действие.',
   )
 }
 
@@ -126,6 +110,7 @@ function toggle(item: CategoryItemView | CategorySectionView): void {
   void run(
     () => api.adminCategories.setActive(item.id, !item.isActive),
     item.isActive ? 'Категория деактивирована.' : 'Категория активирована.',
+    'Не удалось выполнить действие.',
   )
 }
 
@@ -134,7 +119,11 @@ function remove(item: CategoryItemView | CategorySectionView): void {
     return
   }
 
-  void run(() => api.adminCategories.remove(item.id), 'Категория удалена.')
+  void run(
+    () => api.adminCategories.remove(item.id),
+    'Категория удалена.',
+    'Не удалось выполнить действие.',
+  )
 }
 
 onMounted(load)

@@ -3,12 +3,12 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import {
-  ApiError,
   api,
   type AdPhotoSummary,
   type CityOption,
   type SectionOption,
 } from '../api/client'
+import { messageOf } from '../api/errors'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
 import Breadcrumbs from '../components/Breadcrumbs.vue'
@@ -63,7 +63,7 @@ onMounted(async () => {
     form.categoryId = ad.categoryId
     form.contacts = ad.contacts
   } catch (cause) {
-    error.value = cause instanceof ApiError ? cause.message : 'Не удалось загрузить объявление.'
+    error.value = messageOf(cause, 'Не удалось загрузить объявление.')
   } finally {
     loading.value = false
   }
@@ -121,7 +121,7 @@ async function submit(): Promise<void> {
 
     await router.push('/ads/mine')
   } catch (cause) {
-    error.value = cause instanceof ApiError ? cause.message : 'Не удалось сохранить объявление.'
+    error.value = messageOf(cause, 'Не удалось сохранить объявление.')
   } finally {
     submitting.value = false
   }

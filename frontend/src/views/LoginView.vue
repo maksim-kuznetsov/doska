@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { ApiError } from '../api/client'
+import { messageOf } from '../api/errors'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
 import TextField from '../components/TextField.vue'
@@ -26,7 +26,7 @@ async function submit(): Promise<void> {
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
     await router.push(redirect)
   } catch (cause) {
-    error.value = cause instanceof ApiError ? cause.message : 'Не удалось войти.'
+    error.value = messageOf(cause, 'Не удалось войти.')
   } finally {
     submitting.value = false
   }

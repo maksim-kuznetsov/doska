@@ -9,6 +9,7 @@ import {
   type CityOption,
   type SectionOption,
 } from '../api/client'
+import { messageOf } from '../api/errors'
 import AppMessage from '../components/AppMessage.vue'
 import Breadcrumbs from '../components/Breadcrumbs.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -79,7 +80,7 @@ onMounted(async () => {
     if (cause instanceof ApiError && cause.status === 404) {
       notFound.value = true
     } else {
-      error.value = cause instanceof ApiError ? cause.message : 'Не удалось загрузить объявление.'
+      error.value = messageOf(cause, 'Не удалось загрузить объявление.')
     }
   } finally {
     loading.value = false

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
-import { ApiError, api, type OutboxMessageView } from '../api/client'
+import { api, type OutboxMessageView } from '../api/client'
+import { messageOf } from '../api/errors'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
 import Breadcrumbs from '../components/Breadcrumbs.vue'
@@ -13,10 +14,6 @@ const content = ref('')
 const error = ref('')
 const loading = ref(false)
 const loadingContent = ref(false)
-
-function messageOf(cause: unknown, fallback: string): string {
-  return cause instanceof ApiError ? cause.message : fallback
-}
 
 function formatDate(value: string): string {
   const date = new Date(value)

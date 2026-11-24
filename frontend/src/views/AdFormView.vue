@@ -2,7 +2,8 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { ApiError, api, type CityOption, type SectionOption } from '../api/client'
+import { api, type CityOption, type SectionOption } from '../api/client'
+import { messageOf } from '../api/errors'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
 import FormErrors from '../components/FormErrors.vue'
@@ -106,7 +107,7 @@ async function submit(): Promise<void> {
     await api.ads.create(data)
     await router.push('/ads/mine')
   } catch (cause) {
-    error.value = cause instanceof ApiError ? cause.message : 'Не удалось сохранить объявление.'
+    error.value = messageOf(cause, 'Не удалось сохранить объявление.')
   } finally {
     submitting.value = false
   }

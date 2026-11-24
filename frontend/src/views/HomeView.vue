@@ -3,12 +3,12 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import {
-  ApiError,
   api,
   type AdCard as AdCardModel,
   type CityOption,
   type SectionOption,
 } from '../api/client'
+import { messageOf } from '../api/errors'
 import {
   defaultFeedFilters,
   readFilters,
@@ -52,7 +52,7 @@ async function load(): Promise<void> {
     totalCount.value = result.totalCount
     pageSize.value = result.pageSize
   } catch (cause) {
-    error.value = cause instanceof ApiError ? cause.message : 'Не удалось загрузить объявления.'
+    error.value = messageOf(cause, 'Не удалось загрузить объявления.')
     items.value = []
     totalCount.value = 0
   } finally {

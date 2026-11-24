@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { ApiError } from '../api/client'
+import { messageOf } from '../api/errors'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
 import PasswordHints from '../components/PasswordHints.vue'
@@ -26,7 +26,7 @@ async function submit(): Promise<void> {
     await auth.register(email.value, password.value)
     await router.push('/ads/mine')
   } catch (cause) {
-    error.value = cause instanceof ApiError ? cause.message : 'Не удалось зарегистрироваться.'
+    error.value = messageOf(cause, 'Не удалось зарегистрироваться.')
   } finally {
     submitting.value = false
   }

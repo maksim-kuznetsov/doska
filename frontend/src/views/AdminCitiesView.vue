@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
-import { ApiError, api, type CityAdminView } from '../api/client'
+import { api, type CityAdminView } from '../api/client'
+import { messageOf } from '../api/errors'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
 import Breadcrumbs from '../components/Breadcrumbs.vue'
@@ -9,17 +10,13 @@ import EmptyState from '../components/EmptyState.vue'
 import FormSection from '../components/FormSection.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import TextField from '../components/TextField.vue'
+import { useApiAction } from '../composables/useApiAction'
 
 const cities = ref<CityAdminView[]>([])
 const drafts = ref<Record<string, string>>({})
 const newName = ref('')
-const error = ref('')
-const notice = ref('')
+const { error, notice, run } = useApiAction(load)
 const loading = ref(false)
-
-function messageOf(cause: unknown, fallback: string): string {
-  return cause instanceof ApiError ? cause.message : fallback
-}
 
 function rebuildDrafts(): void {
   const next: Record<string, string> = {}
@@ -44,19 +41,6 @@ async function load(): Promise<void> {
   }
 }
 
-async function run(action: () => Promise<unknown>, success: string): Promise<void> {
-  error.value = ''
-  notice.value = ''
-
-  try {
-    await action()
-    notice.value = success
-    await load()
-  } catch (cause) {
-    error.value = messageOf(cause, 'Не удалось выполнить действие.')
-  }
-}
-
 function create(): void {
   const name = newName.value.trim()
 
@@ -67,13 +51,14 @@ function create(): void {
   void run(async () => {
     await api.adminCities.create(name)
     newName.value = ''
-  }, 'Город добавлен.')
+  }, 'Город добавлен.', 'Не удалось выполнить действие.')
 }
 
 function save(city: CityAdminView): void {
   void run(
     () => api.adminCities.rename(city.id, (drafts.value[city.id] ?? city.name).trim()),
     'Город переименован.',
+    'Не удалось выполнить действие.',
   )
 }
 
@@ -81,6 +66,7 @@ function toggle(city: CityAdminView): void {
   void run(
     () => api.adminCities.setActive(city.id, !city.isActive),
     city.isActive ? 'Город деактивирован.' : 'Город активирован.',
+    'Не удалось выполнить действие.',
   )
 }
 
@@ -89,7 +75,11 @@ function remove(city: CityAdminView): void {
     return
   }
 
-  void run(() => api.adminCities.remove(city.id), 'Город удалён.')
+  void run(
+    () => api.adminCities.remove(city.id),
+    'Город удалён.',
+    'Не удалось выполнить действие.',
+  )
 }
 
 onMounted(load)

@@ -2,7 +2,8 @@
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
-import { ApiError, api } from '../api/client'
+import { api } from '../api/client'
+import { messageOf } from '../api/errors'
 import AppMessage from '../components/AppMessage.vue'
 
 const route = useRoute()
@@ -24,7 +25,7 @@ onMounted(async () => {
     message.value = 'Email подтверждён. Теперь можно подавать объявления и жалобы.'
   } catch (cause) {
     state.value = 'failed'
-    message.value = cause instanceof ApiError ? cause.message : 'Не удалось подтвердить email.'
+    message.value = messageOf(cause, 'Не удалось подтвердить email.')
   }
 })
 </script>

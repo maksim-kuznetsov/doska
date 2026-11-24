@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
-import { ApiError, api, type AdSummary } from '../api/client'
+import { api, type AdSummary } from '../api/client'
+import { messageOf } from '../api/errors'
 import ActionLink from '../components/ActionLink.vue'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
 import EmptyState from '../components/EmptyState.vue'
 import ItemRow from '../components/ItemRow.vue'
+import { useApiAction } from '../composables/useApiAction'
 
 const ads = ref<AdSummary[]>([])
-const error = ref('')
-const notice = ref('')
+const { error, notice, run } = useApiAction(load)
 const loading = ref(false)
 
 async function load(): Promise<void> {
@@ -19,35 +20,34 @@ async function load(): Promise<void> {
   try {
     ads.value = await api.ads.mine()
   } catch (cause) {
-    error.value = cause instanceof ApiError ? cause.message : 'Не удалось загрузить объявления.'
+    error.value = messageOf(cause, 'Не удалось загрузить объявления.')
   } finally {
     loading.value = false
   }
 }
 
-async function run(action: () => Promise<unknown>, message: string): Promise<void> {
-  error.value = ''
-  notice.value = ''
-
-  try {
-    await action()
-    notice.value = message
-    await load()
-  } catch (cause) {
-    error.value = cause instanceof ApiError ? cause.message : 'Не удалось выполнить действие.'
-  }
-}
-
 function markSold(ad: AdSummary): void {
-  void run(() => api.ads.markSold(ad.id), 'Объявление отмечено проданным.')
+  void run(
+    () => api.ads.markSold(ad.id),
+    'Объявление отмечено проданным.',
+    'Не удалось выполнить действие.',
+  )
 }
 
 function returnToSale(ad: AdSummary): void {
-  void run(() => api.ads.returnToSale(ad.id), 'Объявление снова в продаже.')
+  void run(
+    () => api.ads.returnToSale(ad.id),
+    'Объявление снова в продаже.',
+    'Не удалось выполнить действие.',
+  )
 }
 
 function renew(ad: AdSummary): void {
-  void run(() => api.ads.renew(ad.id), 'Объявление продлено на 7 дней.')
+  void run(
+    () => api.ads.renew(ad.id),
+    'Объявление продлено на 7 дней.',
+    'Не удалось выполнить действие.',
+  )
 }
 
 function remove(ad: AdSummary): void {
@@ -55,7 +55,11 @@ function remove(ad: AdSummary): void {
     return
   }
 
-  void run(() => api.ads.remove(ad.id), 'Объявление удалено.')
+  void run(
+    () => api.ads.remove(ad.id),
+    'Объявление удалено.',
+    'Не удалось выполнить действие.',
+  )
 }
 
 function canSell(status: string): boolean {

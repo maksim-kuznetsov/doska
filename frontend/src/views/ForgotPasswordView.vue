@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-import { ApiError, api } from '../api/client'
+import { api } from '../api/client'
+import { messageOf } from '../api/errors'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
 import TextField from '../components/TextField.vue'
@@ -20,7 +21,7 @@ async function submit(): Promise<void> {
     await api.auth.forgotPassword(email.value)
     sent.value = true
   } catch (cause) {
-    error.value = cause instanceof ApiError ? cause.message : 'Не удалось отправить письмо.'
+    error.value = messageOf(cause, 'Не удалось отправить письмо.')
   } finally {
     submitting.value = false
   }

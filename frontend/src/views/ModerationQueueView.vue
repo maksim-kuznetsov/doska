@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
-import { ApiError, api, type ModerationQueueItem } from '../api/client'
+import { api, type ModerationQueueItem } from '../api/client'
+import { messageOf } from '../api/errors'
 import AppMessage from '../components/AppMessage.vue'
 import ModerationQueueList from '../components/ModerationQueueList.vue'
+import { useApiAction } from '../composables/useApiAction'
 
 const items = ref<ModerationQueueItem[]>([])
-const error = ref('')
-const notice = ref('')
+const { error, notice, run } = useApiAction(load)
 const loading = ref(false)
 
 async function load(): Promise<void> {
@@ -16,35 +17,34 @@ async function load(): Promise<void> {
   try {
     items.value = await api.moderation.queue()
   } catch (cause) {
-    error.value = cause instanceof ApiError ? cause.message : 'Не удалось загрузить очередь.'
+    error.value = messageOf(cause, 'Не удалось загрузить очередь.')
   } finally {
     loading.value = false
   }
 }
 
-async function run(action: () => Promise<unknown>, message: string): Promise<void> {
-  error.value = ''
-  notice.value = ''
-
-  try {
-    await action()
-    notice.value = message
-    await load()
-  } catch (cause) {
-    error.value = cause instanceof ApiError ? cause.message : 'Не удалось выполнить действие.'
-  }
-}
-
 function approve(id: string): void {
-  void run(() => api.moderation.approve(id), 'Объявление одобрено и опубликовано.')
+  void run(
+    () => api.moderation.approve(id),
+    'Объявление одобрено и опубликовано.',
+    'Не удалось выполнить действие.',
+  )
 }
 
 function reject(id: string, reason: string): void {
-  void run(() => api.moderation.reject(id, reason), 'Объявление отклонено, автор получил письмо.')
+  void run(
+    () => api.moderation.reject(id, reason),
+    'Объявление отклонено, автор получил письмо.',
+    'Не удалось выполнить действие.',
+  )
 }
 
 function hide(id: string, reason: string): void {
-  void run(() => api.moderation.hide(id, reason), 'Объявление скрыто, автор получил письмо.')
+  void run(
+    () => api.moderation.hide(id, reason),
+    'Объявление скрыто, автор получил письмо.',
+    'Не удалось выполнить действие.',
+  )
 }
 
 onMounted(load)

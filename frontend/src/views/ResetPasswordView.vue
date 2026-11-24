@@ -2,7 +2,8 @@
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 
-import { ApiError, api } from '../api/client'
+import { api } from '../api/client'
+import { messageOf } from '../api/errors'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
 import FormErrors from '../components/FormErrors.vue'
@@ -53,7 +54,7 @@ async function submit(): Promise<void> {
     await api.auth.resetPassword(token, password.value)
     done.value = true
   } catch (cause) {
-    error.value = cause instanceof ApiError ? cause.message : 'Не удалось изменить пароль.'
+    error.value = messageOf(cause, 'Не удалось изменить пароль.')
   } finally {
     submitting.value = false
   }
