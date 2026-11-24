@@ -70,3 +70,22 @@ describe('api.ads.get', () => {
     })
   })
 })
+
+describe('api.ads.search', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('передаёт дробные цены в инвариантной записи с точкой', async () => {
+    const page = { items: [], totalCount: 0, page: 1, pageSize: 20 }
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(page))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await api.ads.search({ minPrice: 100.5, maxPrice: 9999999999.99 })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/ads?minPrice=100.5&maxPrice=9999999999.99',
+      expect.objectContaining({ method: 'GET', credentials: 'include' }),
+    )
+  })
+})

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Doska.Api.Background;
@@ -21,6 +22,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -32,6 +34,15 @@ builder.Services
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ServiceExceptionHandler>();
+
+// Числовые поля формы (например, цена объявления) разбираются в инвариантной
+// культуре, чтобы результат не зависел от локали сервера.
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    options.DefaultRequestCulture = new RequestCulture(CultureInfo.InvariantCulture);
+    options.SupportedCultures = [CultureInfo.InvariantCulture];
+    options.SupportedUICultures = [CultureInfo.InvariantCulture];
+});
 
 // Фотографии до 5 МБ держим в памяти, чтобы не создавать временные файлы на диск.
 builder.Services.Configure<FormOptions>(options =>
@@ -256,6 +267,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseRequestLocalization();
 app.UseRateLimiter();
 
 app.UseAuthentication();
