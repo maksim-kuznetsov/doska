@@ -1,3 +1,4 @@
+using Doska.Infrastructure.Common;
 using Doska.Infrastructure.Media;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -47,13 +48,7 @@ public sealed class MediaController(
     }
 
     private string ResolveRoot()
-    {
-        var configured = options.Value.RootPath;
-
-        return Path.IsPathRooted(configured)
-            ? configured
-            : Path.Combine(environment.ContentRootPath, configured);
-    }
+        => PathResolver.Resolve(options.Value.RootPath, environment.ContentRootPath);
 
     private static string ContentTypeFor(string extension)
         => extension.ToLowerInvariant() switch

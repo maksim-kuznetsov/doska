@@ -151,7 +151,7 @@ builder.Services
             // актуальные данные пользователя: смена роли и блокировка действуют сразу.
             OnValidatePrincipal = async context =>
             {
-                var db = context.HttpContext.RequestServices.GetRequiredService<IAppDbContext>();
+                var authService = context.HttpContext.RequestServices.GetRequiredService<AuthService>();
                 var userIdValue = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
 
                 if (!Guid.TryParse(userIdValue, out var userId))
@@ -160,27 +160,15 @@ builder.Services
                     return;
                 }
 
-                var user = await db.Users
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(
-                        candidate => candidate.Id == userId,
-                        context.HttpContext.RequestAborted);
-
-                if (user is null || user.IsBlocked)
+                try
+                {
+                    var user = await authService.GetAsync(userId, context.HttpContext.RequestAborted);
+                    context.ReplacePrincipal(ClaimsPrincipalExtensions.CreateSessionPrincipal(user));
+                }
+                catch (ServiceException)
                 {
                     await RejectSessionAsync(context);
-                    return;
                 }
-
-                var claims = new List<Claim>
-                {
-                    new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                    new(ClaimTypes.Email, user.Email),
-                    new(ClaimTypes.Role, user.Role.ToString()),
-                };
-
-                context.ReplacePrincipal(new ClaimsPrincipal(
-                    new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme)));
             },
             OnRedirectToLogin = context =>
             {

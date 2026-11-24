@@ -1,5 +1,6 @@
 using System.Globalization;
 using Doska.Application.Abstractions;
+using Doska.Infrastructure.Common;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -98,13 +99,7 @@ public sealed class FileEmailOutbox(
     }
 
     private string ResolveDirectory()
-    {
-        var configured = options.Value.OutboxPath;
-
-        return Path.IsPathRooted(configured)
-            ? configured
-            : Path.Combine(environment.ContentRootPath, configured);
-    }
+        => PathResolver.Resolve(options.Value.OutboxPath, environment.ContentRootPath);
 
     /// <summary>
     /// Принимает только простое имя файла внутри каталога ящика: отвергает разделители пути,

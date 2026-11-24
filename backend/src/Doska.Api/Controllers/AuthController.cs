@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Doska.Api.Contracts;
 using Microsoft.AspNetCore.Antiforgery;
 using Doska.Api.Infrastructure;
@@ -119,16 +118,8 @@ public sealed class AuthController(AuthService authService) : ControllerBase
 
     private async Task SignInAsync(AuthenticatedUser user)
     {
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new(ClaimTypes.Email, user.Email),
-            new(ClaimTypes.Role, user.Role),
-        };
-
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
-            new ClaimsPrincipal(identity));
+            ClaimsPrincipalExtensions.CreateSessionPrincipal(user));
     }
 }

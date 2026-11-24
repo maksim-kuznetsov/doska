@@ -1,4 +1,5 @@
 using Doska.Application.Abstractions;
+using Doska.Infrastructure.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -90,11 +91,5 @@ public sealed class MediaMaintenanceService(
     }
 
     private string ResolveRoot()
-    {
-        var configured = options.Value.RootPath;
-
-        return Path.IsPathRooted(configured)
-            ? configured
-            : Path.Combine(environment.ContentRootPath, configured);
-    }
+        => PathResolver.Resolve(options.Value.RootPath, environment.ContentRootPath);
 }

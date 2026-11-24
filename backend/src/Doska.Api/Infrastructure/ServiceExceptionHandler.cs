@@ -18,16 +18,7 @@ public sealed class ServiceExceptionHandler(ILogger<ServiceExceptionHandler> log
     {
         var (statusCode, title) = exception switch
         {
-            ServiceException serviceException => (
-                (int)serviceException.Kind switch
-                {
-                    0 => StatusCodes.Status400BadRequest,
-                    1 => StatusCodes.Status401Unauthorized,
-                    2 => StatusCodes.Status403Forbidden,
-                    3 => StatusCodes.Status404NotFound,
-                    _ => StatusCodes.Status409Conflict,
-                },
-                serviceException.Message),
+            ServiceException serviceException => (StatusCodeFor(serviceException.Kind), serviceException.Message),
             ArgumentException argumentException => (StatusCodes.Status400BadRequest, argumentException.Message),
             InvalidOperationException invalidOperationException => (
                 StatusCodes.Status409Conflict,
@@ -54,4 +45,15 @@ public sealed class ServiceExceptionHandler(ILogger<ServiceExceptionHandler> log
 
         return true;
     }
+
+    /// <summary>Сопоставляет категорию ошибки сценария с HTTP-кодом ответа.</summary>
+    private static int StatusCodeFor(ServiceErrorKind kind) => kind switch
+    {
+        ServiceErrorKind.Validation => StatusCodes.Status400BadRequest,
+        ServiceErrorKind.Unauthorized => StatusCodes.Status401Unauthorized,
+        ServiceErrorKind.Forbidden => StatusCodes.Status403Forbidden,
+        ServiceErrorKind.NotFound => StatusCodes.Status404NotFound,
+        ServiceErrorKind.Conflict => StatusCodes.Status409Conflict,
+        _ => StatusCodes.Status409Conflict,
+    };
 }

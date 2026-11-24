@@ -1,5 +1,6 @@
 using System.Text;
 using Doska.Application.Abstractions;
+using Doska.Infrastructure.Common;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -49,13 +50,7 @@ public sealed class FileEmailSender(
     }
 
     private string ResolveDirectory()
-    {
-        var configured = options.Value.OutboxPath;
-
-        return Path.IsPathRooted(configured)
-            ? configured
-            : Path.Combine(environment.ContentRootPath, configured);
-    }
+        => PathResolver.Resolve(options.Value.OutboxPath, environment.ContentRootPath);
 
     private static string Sanitize(string email)
     {

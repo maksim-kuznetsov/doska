@@ -1,5 +1,6 @@
 using Doska.Application.Abstractions;
 using Doska.Application.Common;
+using Doska.Infrastructure.Common;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using SkiaSharp;
@@ -121,16 +122,7 @@ public sealed class LocalAdPhotoStorage(
     }
 
     private string RootPath
-    {
-        get
-        {
-            var configured = options.Value.RootPath;
-
-            return Path.IsPathRooted(configured)
-                ? configured
-                : Path.Combine(environment.ContentRootPath, configured);
-        }
-    }
+        => PathResolver.Resolve(options.Value.RootPath, environment.ContentRootPath);
 
     private static string ExtensionFor(string contentType)
         => contentType.ToLowerInvariant() switch

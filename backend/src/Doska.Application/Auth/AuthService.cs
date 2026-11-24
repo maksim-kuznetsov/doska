@@ -267,6 +267,11 @@ public sealed class AuthService(
         var user = await db.Users.FirstOrDefaultAsync(candidate => candidate.Id == userId, cancellationToken)
             ?? throw new ServiceException(ServiceErrorKind.Unauthorized, "Требуется вход.");
 
+        if (user.IsBlocked)
+        {
+            throw new ServiceException(ServiceErrorKind.Forbidden, "Аккаунт заблокирован. Обратитесь к администрации.");
+        }
+
         return AuthenticatedUser.From(user);
     }
 
