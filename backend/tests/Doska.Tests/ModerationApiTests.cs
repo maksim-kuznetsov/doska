@@ -344,7 +344,7 @@ public sealed class ModerationApiTests : IClassFixture<ApiFactory>, IAsyncLifeti
         await TestDatabase.WithContextAsync(_factory, async db =>
         {
             var user = await db.Users.FirstAsync(candidate => candidate.Email == email);
-            user.IsEmailConfirmed = true;
+            user.ConfirmEmail(DateTimeOffset.UtcNow);
             await db.SaveChangesAsync();
         });
     }
@@ -357,11 +357,11 @@ public sealed class ModerationApiTests : IClassFixture<ApiFactory>, IAsyncLifeti
 
             if (trusted)
             {
-                user.GrantTrust();
+                user.GrantTrust(DateTimeOffset.UtcNow);
             }
             else
             {
-                user.RevokeTrust();
+                user.RevokeTrust(DateTimeOffset.UtcNow);
             }
 
             await db.SaveChangesAsync();
@@ -377,13 +377,10 @@ public sealed class ModerationApiTests : IClassFixture<ApiFactory>, IAsyncLifeti
             var db = provider.GetRequiredService<AppDbContext>();
             var passwordHasher = provider.GetRequiredService<IPasswordHasher>();
 
-            db.Users.Add(new User
-            {
-                Email = email,
-                PasswordHash = passwordHasher.Hash(Password),
-                Role = role,
-                IsEmailConfirmed = true,
-            });
+            db.Users.Add(TestData.CreateUser(
+                email,
+                role,
+                passwordHash: passwordHasher.Hash(Password)));
 
             await db.SaveChangesAsync();
             return 0;
@@ -396,12 +393,12 @@ public sealed class ModerationApiTests : IClassFixture<ApiFactory>, IAsyncLifeti
         => await TestDatabase.WithContextAsync(_factory, async db =>
         {
             var suffix = Guid.NewGuid().ToString("N");
-            var section = new Category { Name = $"Раздел {suffix}" };
+            var section = TestData.CreateSection($"Раздел {suffix}");
             db.Categories.Add(section);
             await db.SaveChangesAsync();
 
-            var subsection = new Category { Name = $"Подраздел {suffix}", ParentId = section.Id };
-            var city = new City { Name = $"Город {suffix}" };
+            var subsection = TestData.CreateSubsection(section, $"Подраздел {suffix}");
+            var city = TestData.CreateCity($"Город {suffix}");
             db.Categories.Add(subsection);
             db.Cities.Add(city);
             await db.SaveChangesAsync();

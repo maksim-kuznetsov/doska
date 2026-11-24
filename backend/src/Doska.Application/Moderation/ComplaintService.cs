@@ -67,13 +67,7 @@ public sealed class ComplaintService(IAppDbContext db, IEmailSender email, TimeP
             throw new ServiceException(ServiceErrorKind.Conflict, "Жалоба на это объявление уже отправлена.");
         }
 
-        db.AdComplaints.Add(new AdComplaint
-        {
-            AdId = adId,
-            AuthorId = authorId,
-            Reason = reason.Trim(),
-            Status = ComplaintStatus.Open,
-        });
+        db.AdComplaints.Add(new AdComplaint(adId, authorId, reason.Trim(), clock.GetUtcNow()));
 
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -118,7 +112,7 @@ public sealed class ComplaintService(IAppDbContext db, IEmailSender email, TimeP
             var ad = await db.Ads.FirstOrDefaultAsync(candidate => candidate.Id == complaint.AdId, cancellationToken)
                 ?? throw new ServiceException(ServiceErrorKind.NotFound, "Объявление не найдено.");
 
-            ad.Hide(hideReason ?? string.Empty);
+            ad.Hide(hideReason ?? string.Empty, clock.GetUtcNow());
             await db.SaveChangesAsync(cancellationToken);
 
             var author = await db.Users.FirstAsync(user => user.Id == ad.AuthorId, cancellationToken);

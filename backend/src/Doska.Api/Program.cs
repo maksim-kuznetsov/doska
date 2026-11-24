@@ -361,8 +361,9 @@ static async Task InitReferenceDataAsync(WebApplication app)
         .GetRequiredService<ILoggerFactory>()
         .CreateLogger("Doska.InitData");
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var clock = scope.ServiceProvider.GetRequiredService<TimeProvider>();
 
-    await ReferenceDataSeeder.SeedAsync(context);
+    await ReferenceDataSeeder.SeedAsync(context, clock);
     logger.LogInformation("Справочники городов и категорий созданы.");
 }
 
@@ -373,8 +374,9 @@ static async Task SeedCatalogAsync(WebApplication app)
         .GetRequiredService<ILoggerFactory>()
         .CreateLogger("Doska.SeedCatalog");
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var clock = scope.ServiceProvider.GetRequiredService<TimeProvider>();
 
-    var result = await ExtendedCatalogSeeder.SeedAsync(context);
+    var result = await ExtendedCatalogSeeder.SeedAsync(context, clock);
 
     logger.LogInformation(
         "Расширенный справочник: добавлено городов — {Cities}, разделов — {Sections}, подразделов — {Subsections}; пропущено занятых названий — {Skipped}.",
@@ -425,8 +427,9 @@ static async Task<int> CreateAdminAsync(WebApplication app)
     using var scope = app.Services.CreateScope();
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+    var clock = scope.ServiceProvider.GetRequiredService<TimeProvider>();
 
-    var created = await AdminSeeder.CreateOrUpdateAsync(context, passwordHasher, email, password);
+    var created = await AdminSeeder.CreateOrUpdateAsync(context, passwordHasher, email, password, clock);
 
     logger.LogInformation(
         created
@@ -452,8 +455,9 @@ static async Task SeedDemoDataAsync(WebApplication app)
 
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+    var clock = scope.ServiceProvider.GetRequiredService<TimeProvider>();
 
-    await DemoDataSeeder.SeedAsync(context, passwordHasher);
+    await DemoDataSeeder.SeedAsync(context, passwordHasher, clock);
     logger.LogInformation("Демонстрационные данные созданы.");
 }
 

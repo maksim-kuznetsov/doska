@@ -5,56 +5,100 @@ namespace Doska.Domain.Entities;
 /// <summary>Объявление.</summary>
 public class Ad : Entity
 {
-    /// <summary>Автор объявления.</summary>
-    public Guid AuthorId { get; set; }
+    /// <summary>Срок публикации объявления в днях.</summary>
+    public const int LifetimeDays = 7;
 
     /// <summary>Автор объявления.</summary>
-    public User? Author { get; set; }
+    public Guid AuthorId { get; private set; }
+
+    /// <summary>Автор объявления.</summary>
+    public User? Author { get; private set; }
 
     /// <summary>Категория объявления: всегда подраздел.</summary>
-    public Guid CategoryId { get; set; }
+    public Guid CategoryId { get; private set; }
 
     /// <summary>Категория объявления.</summary>
-    public Category? Category { get; set; }
+    public Category? Category { get; private set; }
 
     /// <summary>Город объявления.</summary>
-    public Guid CityId { get; set; }
+    public Guid CityId { get; private set; }
 
     /// <summary>Город объявления.</summary>
-    public City? City { get; set; }
+    public City? City { get; private set; }
 
     /// <summary>Заголовок объявления.</summary>
-    public string Title { get; set; } = string.Empty;
+    public string Title { get; private set; } = string.Empty;
 
     /// <summary>Описание объявления.</summary>
-    public string Description { get; set; } = string.Empty;
+    public string Description { get; private set; } = string.Empty;
 
     /// <summary>Цена; неотрицательное значение.</summary>
-    public decimal Price { get; set; }
+    public decimal Price { get; private set; }
 
     /// <summary>Контактные данные автора в свободной форме.</summary>
-    public string Contacts { get; set; } = string.Empty;
+    public string Contacts { get; private set; } = string.Empty;
 
     /// <summary>Текущее состояние объявления.</summary>
-    public AdStatus Status { get; set; } = AdStatus.OnModeration;
+    public AdStatus Status { get; private set; } = AdStatus.OnModeration;
 
     /// <summary>Причина отклонения или скрытия; заполняется модератором.</summary>
-    public string? ModerationReason { get; set; }
+    public string? ModerationReason { get; private set; }
 
     /// <summary>
     /// Начало текущего срока публикации. Отдельного поля окончания нет:
     /// объявление уходит в архив, когда прошло больше семи суток с этого момента.
     /// </summary>
-    public DateTimeOffset PublishedAt { get; set; }
+    public DateTimeOffset PublishedAt { get; private set; }
 
     /// <summary>Момент отправки напоминания об истечении срока; <c>null</c> — напоминание не отправлено.</summary>
-    public DateTimeOffset? ReminderSentAt { get; set; }
+    public DateTimeOffset? ReminderSentAt { get; private set; }
 
     /// <summary>Фотографии объявления; не более пяти.</summary>
-    public ICollection<AdPhoto> Photos { get; set; } = new List<AdPhoto>();
+    public ICollection<AdPhoto> Photos { get; } = new List<AdPhoto>();
 
     /// <summary>Жалобы на объявление.</summary>
-    public ICollection<AdComplaint> Complaints { get; set; } = new List<AdComplaint>();
+    public ICollection<AdComplaint> Complaints { get; } = new List<AdComplaint>();
+
+    /// <summary>Создаёт пустое объявление: используется EF Core при чтении из базы.</summary>
+    private Ad()
+    {
+    }
+
+    /// <summary>
+    /// Создаёт объявление. Статус зависит от доверия автора: доверенный публикуется
+    /// сразу, недоверенный отправляется на проверку.
+    /// </summary>
+    /// <param name="authorId">Автор объявления.</param>
+    /// <param name="categoryId">Подраздел категории.</param>
+    /// <param name="cityId">Город.</param>
+    /// <param name="title">Заголовок.</param>
+    /// <param name="description">Описание.</param>
+    /// <param name="price">Цена.</param>
+    /// <param name="contacts">Контактные данные.</param>
+    /// <param name="trustedAuthor">Признак доверия автора.</param>
+    /// <param name="now">Момент подачи.</param>
+    public Ad(
+        Guid authorId,
+        Guid categoryId,
+        Guid cityId,
+        string title,
+        string description,
+        decimal price,
+        string contacts,
+        bool trustedAuthor,
+        DateTimeOffset now)
+        : base(now)
+    {
+        AuthorId = authorId;
+        CategoryId = categoryId;
+        CityId = cityId;
+        Title = title;
+        Description = description;
+        Price = price;
+        Contacts = contacts;
+        Status = trustedAuthor ? AdStatus.Active : AdStatus.OnModeration;
+        PublishedAt = trustedAuthor ? now : default;
+    }
 
     /// <summary>
     /// Одобряет объявление, находящееся на проверке: переводит его в статус «активно»
@@ -72,15 +116,17 @@ public class Ad : Entity
         Status = AdStatus.Active;
         PublishedAt = now;
         ModerationReason = null;
+        MarkUpdated(now);
     }
 
     /// <summary>
     /// Отклоняет объявление, находящееся на проверке, с обязательной причиной.
     /// </summary>
     /// <param name="reason">Причина отклонения.</param>
+    /// <param name="now">Момент принятия решения.</param>
     /// <exception cref="InvalidOperationException">Объявление не находится на проверке.</exception>
     /// <exception cref="ArgumentException">Причина не указана.</exception>
-    public void Reject(string reason)
+    public void Reject(string reason, DateTimeOffset now)
     {
         if (Status != AdStatus.OnModeration)
         {
@@ -94,15 +140,17 @@ public class Ad : Entity
 
         Status = AdStatus.Rejected;
         ModerationReason = reason.Trim();
+        MarkUpdated(now);
     }
 
     /// <summary>
     /// Скрывает активное объявление с обязательной причиной.
     /// </summary>
     /// <param name="reason">Причина скрытия.</param>
+    /// <param name="now">Момент скрытия.</param>
     /// <exception cref="InvalidOperationException">Объявление не активно.</exception>
     /// <exception cref="ArgumentException">Причина не указана.</exception>
-    public void Hide(string reason)
+    public void Hide(string reason, DateTimeOffset now)
     {
         if (Status != AdStatus.Active)
         {
@@ -116,17 +164,16 @@ public class Ad : Entity
 
         Status = AdStatus.Hidden;
         ModerationReason = reason.Trim();
+        MarkUpdated(now);
     }
-
-    /// <summary>Срок публикации объявления в днях.</summary>
-    public const int LifetimeDays = 7;
 
     /// <summary>
     /// Завершает редактирование: непроверенный автор возвращает объявление на проверку,
     /// доверенный сохраняет текущий статус.
     /// </summary>
     /// <param name="trustedAuthor">Признак доверия автора.</param>
-    public void CompleteEdit(bool trustedAuthor)
+    /// <param name="now">Момент завершения редактирования.</param>
+    public void CompleteEdit(bool trustedAuthor, DateTimeOffset now)
     {
         if (trustedAuthor || Status == AdStatus.OnModeration)
         {
@@ -136,11 +183,44 @@ public class Ad : Entity
         Status = AdStatus.OnModeration;
         ModerationReason = null;
         ReminderSentAt = null;
+        MarkUpdated(now);
+    }
+
+    /// <summary>
+    /// Изменяет содержимое объявления и завершает редактирование по уровню доверия автора.
+    /// </summary>
+    /// <param name="title">Новый заголовок.</param>
+    /// <param name="description">Новое описание.</param>
+    /// <param name="price">Новая цена.</param>
+    /// <param name="contacts">Новые контактные данные.</param>
+    /// <param name="cityId">Новый город.</param>
+    /// <param name="categoryId">Новый подраздел категории.</param>
+    /// <param name="trustedAuthor">Признак доверия автора.</param>
+    /// <param name="now">Момент изменения.</param>
+    public void UpdateDetails(
+        string title,
+        string description,
+        decimal price,
+        string contacts,
+        Guid cityId,
+        Guid categoryId,
+        bool trustedAuthor,
+        DateTimeOffset now)
+    {
+        Title = title;
+        Description = description;
+        Price = price;
+        Contacts = contacts;
+        CityId = cityId;
+        CategoryId = categoryId;
+        CompleteEdit(trustedAuthor, now);
+        MarkUpdated(now);
     }
 
     /// <summary>Отмечает активное объявление проданным.</summary>
+    /// <param name="now">Момент продажи.</param>
     /// <exception cref="InvalidOperationException">Объявление не активно.</exception>
-    public void MarkSold()
+    public void MarkSold(DateTimeOffset now)
     {
         if (Status != AdStatus.Active)
         {
@@ -148,6 +228,7 @@ public class Ad : Entity
         }
 
         Status = AdStatus.Sold;
+        MarkUpdated(now);
     }
 
     /// <summary>
@@ -169,17 +250,20 @@ public class Ad : Entity
             Status = AdStatus.Active;
             PublishedAt = now;
             ReminderSentAt = null;
+            MarkUpdated(now);
             return;
         }
 
         Status = AdStatus.OnModeration;
         ModerationReason = null;
         ReminderSentAt = null;
+        MarkUpdated(now);
     }
 
     /// <summary>Переводит активное объявление в архив.</summary>
+    /// <param name="now">Момент архивации.</param>
     /// <exception cref="InvalidOperationException">Объявление не активно.</exception>
-    public void Archive()
+    public void Archive(DateTimeOffset now)
     {
         if (Status != AdStatus.Active)
         {
@@ -187,6 +271,7 @@ public class Ad : Entity
         }
 
         Status = AdStatus.Archived;
+        MarkUpdated(now);
     }
 
     /// <summary>
@@ -205,5 +290,14 @@ public class Ad : Entity
         Status = AdStatus.Active;
         PublishedAt = now;
         ReminderSentAt = null;
+        MarkUpdated(now);
+    }
+
+    /// <summary>Отмечает, что автору отправлено напоминание об истечении срока.</summary>
+    /// <param name="now">Момент отправки напоминания.</param>
+    public void MarkReminderSent(DateTimeOffset now)
+    {
+        ReminderSentAt = now;
+        MarkUpdated(now);
     }
 }

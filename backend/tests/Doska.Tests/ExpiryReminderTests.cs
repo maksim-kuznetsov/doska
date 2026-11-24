@@ -124,10 +124,9 @@ public sealed class ExpiryReminderTests : IClassFixture<ApiFactory>, IAsyncLifet
         await TestDatabase.WithContextAsync(_factory, async db =>
         {
             var ad = await db.Ads.FirstAsync(candidate => candidate.Id == adId, ct);
-            ad.Renew(DateTimeOffset.UtcNow);
 
-            // Спустя неделю объявление снова подходит к сроку архива.
-            ad.PublishedAt = DateTimeOffset.UtcNow.AddDays(-6.5);
+            // Продление на срок, который снова подходит к границе напоминания.
+            ad.Renew(DateTimeOffset.UtcNow.AddDays(-6.5));
             await db.SaveChangesAsync(ct);
         });
 
@@ -162,37 +161,27 @@ public sealed class ExpiryReminderTests : IClassFixture<ApiFactory>, IAsyncLifet
             var passwordHasher = provider.GetRequiredService<IPasswordHasher>();
             var suffix = Guid.NewGuid().ToString("N");
 
-            var section = new Category { Name = $"{CategoryPrefix}{suffix}" };
+            var section = TestData.CreateSection($"{CategoryPrefix}{suffix}");
             db.Categories.Add(section);
             await db.SaveChangesAsync(ct);
 
-            var subsection = new Category { Name = $"{CategoryPrefix}под-{suffix}", ParentId = section.Id };
-            var city = new City { Name = $"{CityPrefix}{suffix}" };
-            var author = new User
-            {
-                Email = $"reminder-{suffix}@example.com",
-                PasswordHash = passwordHasher.Hash(Password),
-                Role = UserRole.User,
-                IsEmailConfirmed = true,
-            };
+            var subsection = TestData.CreateSubsection(section, $"{CategoryPrefix}под-{suffix}");
+            var city = TestData.CreateCity($"{CityPrefix}{suffix}");
+            var author = TestData.CreateUser(
+                $"reminder-{suffix}@example.com",
+                passwordHash: passwordHasher.Hash(Password));
 
             db.Categories.Add(subsection);
             db.Cities.Add(city);
             db.Users.Add(author);
             await db.SaveChangesAsync(ct);
 
-            var ad = new Ad
-            {
-                AuthorId = author.Id,
-                CategoryId = subsection.Id,
-                CityId = city.Id,
-                Title = title,
-                Description = "Описание",
-                Price = 1000m,
-                Contacts = "+7 900 000-00-00",
-                Status = AdStatus.Active,
-                PublishedAt = publishedAt,
-            };
+            var ad = TestData.CreateAd(
+                author.Id,
+                subsection.Id,
+                city.Id,
+                title,
+                publishedAt: publishedAt);
 
             db.Ads.Add(ad);
             await db.SaveChangesAsync(ct);

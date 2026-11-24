@@ -173,13 +173,10 @@ public sealed class AdminOutboxApiTests : IClassFixture<ApiFactory>, IAsyncLifet
             var db = provider.GetRequiredService<AppDbContext>();
             var passwordHasher = provider.GetRequiredService<IPasswordHasher>();
 
-            db.Users.Add(new User
-            {
-                Email = email,
-                PasswordHash = passwordHasher.Hash(Password),
-                Role = role,
-                IsEmailConfirmed = true,
-            });
+            db.Users.Add(TestData.CreateUser(
+                email,
+                role,
+                passwordHash: passwordHasher.Hash(Password)));
 
             await db.SaveChangesAsync();
             return 0;

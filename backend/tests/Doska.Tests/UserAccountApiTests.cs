@@ -127,13 +127,12 @@ public sealed class UserAccountApiTests : IClassFixture<ApiFactory>, IAsyncLifet
         await TestDatabase.WithContextAsync(_factory, async db =>
         {
             var user = await db.Users.FirstAsync(candidate => candidate.Email == email, ct);
-            db.UserTokens.Add(new UserToken
-            {
-                UserId = user.Id,
-                TokenHash = legacyHash,
-                Purpose = TokenPurpose.EmailConfirmation,
-                ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
-            });
+            db.UserTokens.Add(new UserToken(
+                user.Id,
+                legacyHash,
+                TokenPurpose.EmailConfirmation,
+                DateTimeOffset.UtcNow.AddHours(1),
+                DateTimeOffset.UtcNow));
             await db.SaveChangesAsync(ct);
         });
 
@@ -307,11 +306,21 @@ public sealed class UserAccountApiTests : IClassFixture<ApiFactory>, IAsyncLifet
                 .Where(candidate => candidate.UserId == user.Id && candidate.Purpose == TokenPurpose.PasswordReset)
                 .ToListAsync(ct);
 
-            foreach (var resetToken in stored)
-            {
-                resetToken.ExpiresAt = DateTimeOffset.UtcNow.AddHours(-1);
-            }
+            var now = DateTimeOffset.UtcNow;
+            var expired = stored
+                .Select(resetToken => new UserToken(
+                    user.Id,
+                    resetToken.TokenHash,
+                    TokenPurpose.PasswordReset,
+                    now.AddHours(-1),
+                    now))
+                .ToList();
 
+            // Истёкший токен создаётся заново: отметку истечения задаёт конструктор.
+            db.UserTokens.RemoveRange(stored);
+            await db.SaveChangesAsync(ct);
+
+            db.UserTokens.AddRange(expired);
             await db.SaveChangesAsync(ct);
         });
 
@@ -529,13 +538,10 @@ public sealed class UserAccountApiTests : IClassFixture<ApiFactory>, IAsyncLifet
             var db = provider.GetRequiredService<AppDbContext>();
             var passwordHasher = provider.GetRequiredService<IPasswordHasher>();
 
-            db.Users.Add(new User
-            {
-                Email = email,
-                PasswordHash = passwordHasher.Hash(StaffPassword),
-                Role = role,
-                IsEmailConfirmed = true,
-            });
+            db.Users.Add(TestData.CreateUser(
+                email,
+                role,
+                passwordHash: passwordHasher.Hash(StaffPassword)));
 
             await db.SaveChangesAsync(cancellationToken);
             return 0;

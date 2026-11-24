@@ -7,7 +7,8 @@ using Npgsql;
 namespace Doska.Tests;
 
 /// <summary>
-/// Проверка заполнения <c>created_at</c> и <c>updated_at</c> в <c>SaveChanges</c>.
+/// Проверка владения отметками времени доменом: <c>created_at</c> задаёт конструктор,
+/// <c>updated_at</c> — доменный метод, а сохранение в базу их не проставляет.
 /// Тесту нужна работающая база PostgreSQL: если она недоступна, проверка
 /// пропускается, чтобы обычный запуск тестов не требовал docker compose.
 /// </summary>
@@ -17,7 +18,7 @@ public sealed class SaveChangesTests
         "Host=localhost;Port=5433;Database=doska;Username=doska;Password=doska";
 
     [Fact]
-    public async Task SaveChanges_fills_created_at_and_updates_updated_at()
+    public async Task Domain_owns_timestamps_and_persistence_does_not_change_them()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var connectionString = ResolveConnectionString();
@@ -34,42 +35,46 @@ public sealed class SaveChangesTests
             .UseSnakeCaseNamingConvention()
             .Options;
 
-        var start = new DateTimeOffset(2026, 11, 18, 12, 0, 0, TimeSpan.Zero);
-        var clock = new ManualTimeProvider(start);
+        var createdAt = new DateTimeOffset(2026, 11, 18, 12, 0, 0, TimeSpan.Zero);
+        var renamedAt = createdAt.AddMinutes(5);
         var cityName = $"Тестовый город {Guid.NewGuid():N}";
         var updatedCityName = $"{cityName} (обновлён)";
 
-        await using (var context = new AppDbContext(options, clock))
+        await using (var context = new AppDbContext(options))
         {
             await context.Database.MigrateAsync(cancellationToken);
-            context.Cities.Add(new City { Name = cityName });
+            context.Cities.Add(new City(cityName, createdAt));
             await context.SaveChangesAsync(cancellationToken);
         }
 
-        await using (var context = new AppDbContext(options, clock))
+        await using (var context = new AppDbContext(options))
         {
             var city = await context.Cities.SingleAsync(
                 candidate => candidate.Name == cityName,
                 cancellationToken);
 
-            Assert.Equal(start, city.CreatedAt);
-            Assert.Equal(start, city.UpdatedAt);
+            Assert.Equal(createdAt, city.CreatedAt);
+            Assert.Equal(createdAt, city.UpdatedAt);
 
-            clock.UtcNow = start.AddMinutes(5);
-            city.Name = updatedCityName;
+            // Сохранение без доменного изменения отметку не двигает.
+            await context.SaveChangesAsync(cancellationToken);
+            Assert.Equal(createdAt, city.UpdatedAt);
+
+            city.Rename(updatedCityName, renamedAt);
             await context.SaveChangesAsync(cancellationToken);
 
-            Assert.Equal(start, city.CreatedAt);
-            Assert.Equal(start.AddMinutes(5), city.UpdatedAt);
+            Assert.Equal(createdAt, city.CreatedAt);
+            Assert.Equal(renamedAt, city.UpdatedAt);
         }
 
-        await using (var context = new AppDbContext(options, clock))
+        await using (var context = new AppDbContext(options))
         {
             var city = await context.Cities.SingleAsync(
                 candidate => candidate.Name == updatedCityName,
                 cancellationToken);
 
-            Assert.Equal(start.AddMinutes(5), city.UpdatedAt);
+            Assert.Equal(createdAt, city.CreatedAt);
+            Assert.Equal(renamedAt, city.UpdatedAt);
 
             context.Cities.Remove(city);
             await context.SaveChangesAsync(cancellationToken);
@@ -105,12 +110,5 @@ public sealed class SaveChangesTests
         {
             return false;
         }
-    }
-
-    private sealed class ManualTimeProvider(DateTimeOffset utcNow) : TimeProvider
-    {
-        public DateTimeOffset UtcNow { get; set; } = utcNow;
-
-        public override DateTimeOffset GetUtcNow() => UtcNow;
     }
 }

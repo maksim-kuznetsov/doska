@@ -30,7 +30,7 @@ public sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbConte
             .UseSnakeCaseNamingConvention()
             .Options;
 
-        return new AppDbContext(options, TimeProvider.System);
+        return new AppDbContext(options);
     }
 
     private static string ResolveConnectionString()

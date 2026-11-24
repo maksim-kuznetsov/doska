@@ -364,13 +364,10 @@ public sealed class CategoryManagementApiTests : IClassFixture<ApiFactory>, IAsy
             var db = provider.GetRequiredService<AppDbContext>();
             var passwordHasher = provider.GetRequiredService<IPasswordHasher>();
 
-            db.Users.Add(new User
-            {
-                Email = email,
-                PasswordHash = passwordHasher.Hash(Password),
-                Role = role,
-                IsEmailConfirmed = true,
-            });
+            db.Users.Add(TestData.CreateUser(
+                email,
+                role,
+                passwordHash: passwordHasher.Hash(Password)));
 
             await db.SaveChangesAsync();
             return 0;
@@ -389,31 +386,20 @@ public sealed class CategoryManagementApiTests : IClassFixture<ApiFactory>, IAsy
             var passwordHasher = provider.GetRequiredService<IPasswordHasher>();
             var suffix = Guid.NewGuid().ToString("N");
 
-            var author = new User
-            {
-                Email = $"cat-author-{suffix}@example.com",
-                PasswordHash = passwordHasher.Hash(Password),
-                Role = UserRole.User,
-                IsEmailConfirmed = true,
-            };
-            var city = new City { Name = $"{CityPrefix}{suffix}" };
+            var author = TestData.CreateUser(
+                $"cat-author-{suffix}@example.com",
+                passwordHash: passwordHasher.Hash(Password));
+            var city = TestData.CreateCity($"{CityPrefix}{suffix}");
 
             db.Users.Add(author);
             db.Cities.Add(city);
             await db.SaveChangesAsync(ct);
 
-            db.Ads.Add(new Ad
-            {
-                AuthorId = author.Id,
-                CategoryId = categoryId,
-                CityId = city.Id,
-                Title = $"{AdPrefix}{marker}",
-                Description = "Описание",
-                Price = 1000m,
-                Contacts = "+7 900 000-00-00",
-                Status = AdStatus.Active,
-                PublishedAt = DateTimeOffset.UtcNow,
-            });
+            db.Ads.Add(TestData.CreateAd(
+                author.Id,
+                categoryId,
+                city.Id,
+                $"{AdPrefix}{marker}"));
 
             await db.SaveChangesAsync(ct);
             return 0;

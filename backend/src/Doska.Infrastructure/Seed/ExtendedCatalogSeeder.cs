@@ -25,16 +25,20 @@ public static class ExtendedCatalogSeeder
     /// <summary>Добавляет отсутствующие города и категории расширенного справочника.</summary>
     public static async Task<CatalogSeedResult> SeedAsync(
         AppDbContext db,
+        TimeProvider clock,
         CancellationToken cancellationToken = default)
     {
-        var citiesAdded = await EnsureCitiesAsync(db, cancellationToken);
+        var citiesAdded = await EnsureCitiesAsync(db, clock, cancellationToken);
         var (sectionsAdded, subsectionsAdded, skipped) =
-            await EnsureCategoriesAsync(db, cancellationToken);
+            await EnsureCategoriesAsync(db, clock, cancellationToken);
 
         return new CatalogSeedResult(citiesAdded, sectionsAdded, subsectionsAdded, skipped);
     }
 
-    private static async Task<int> EnsureCitiesAsync(AppDbContext db, CancellationToken cancellationToken)
+    private static async Task<int> EnsureCitiesAsync(
+        AppDbContext db,
+        TimeProvider clock,
+        CancellationToken cancellationToken)
     {
         var existing = await db.Cities
             .Select(city => city.Name)
@@ -50,7 +54,7 @@ public static class ExtendedCatalogSeeder
                 continue;
             }
 
-            db.Cities.Add(new City { Name = name, IsActive = true });
+            db.Cities.Add(new City(name, clock.GetUtcNow()));
             added++;
         }
 
@@ -63,19 +67,20 @@ public static class ExtendedCatalogSeeder
     }
 
     private static async Task<(int Sections, int Subsections, IReadOnlyList<string> Skipped)>
-        EnsureCategoriesAsync(AppDbContext db, CancellationToken cancellationToken)
+        EnsureCategoriesAsync(
+            AppDbContext db,
+            TimeProvider clock,
+            CancellationToken cancellationToken)
     {
-        // Название категории уникально глобально, поэтому карта «название → (id, родитель)»
+        // Название категории уникально глобально, поэтому карта «название → категория»
         // полностью описывает занятые имена.
-        var categories = await db.Categories
-            .Select(category => new { category.Id, category.Name, category.ParentId })
-            .ToListAsync(cancellationToken);
+        var categories = await db.Categories.ToListAsync(cancellationToken);
 
-        var known = new Dictionary<string, (Guid Id, Guid? ParentId)>(StringComparer.Ordinal);
+        var known = new Dictionary<string, Category>(StringComparer.Ordinal);
 
         foreach (var category in categories)
         {
-            known[category.Name] = (category.Id, category.ParentId);
+            known[category.Name] = category;
         }
 
         var sectionsAdded = 0;
@@ -87,27 +92,26 @@ public static class ExtendedCatalogSeeder
         {
             sectionOrder++;
 
-            Guid sectionId;
+            Category section;
 
             if (known.TryGetValue(sectionName, out var existingSection))
             {
-                if (existingSection.ParentId is not null)
+                if (!existingSection.IsSection)
                 {
                     // Имя занято подразделом: раздел с таким названием создать нельзя.
                     skipped.Add(sectionName);
                     continue;
                 }
 
-                sectionId = existingSection.Id;
+                section = existingSection;
             }
             else
             {
-                var section = new Category { Name = sectionName, SortOrder = sectionOrder, IsActive = true };
+                section = new Category(sectionName, sectionOrder, clock.GetUtcNow());
                 db.Categories.Add(section);
                 await db.SaveChangesAsync(cancellationToken);
 
-                sectionId = section.Id;
-                known[sectionName] = (section.Id, null);
+                known[sectionName] = section;
                 sectionsAdded++;
             }
 
@@ -122,18 +126,11 @@ public static class ExtendedCatalogSeeder
                     continue;
                 }
 
-                var subsection = new Category
-                {
-                    Name = subsectionName,
-                    ParentId = sectionId,
-                    SortOrder = subsectionOrder,
-                    IsActive = true,
-                };
-
+                var subsection = new Category(subsectionName, subsectionOrder, section, clock.GetUtcNow());
                 db.Categories.Add(subsection);
                 await db.SaveChangesAsync(cancellationToken);
 
-                known[subsectionName] = (subsection.Id, sectionId);
+                known[subsectionName] = subsection;
                 subsectionsAdded++;
             }
         }

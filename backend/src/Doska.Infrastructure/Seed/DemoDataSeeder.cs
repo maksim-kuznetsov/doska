@@ -24,20 +24,28 @@ public static class DemoDataSeeder
     ];
 
     /// <summary>Добавляет демонстрационные данные, если их ещё нет.</summary>
+    /// <param name="db">Контекст базы данных.</param>
+    /// <param name="passwordHasher">Хеширование паролей.</param>
+    /// <param name="clock">Источник времени для отметок создания.</param>
+    /// <param name="cancellationToken">Токен отмены.</param>
     public static async Task SeedAsync(
         AppDbContext db,
         IPasswordHasher passwordHasher,
+        TimeProvider clock,
         CancellationToken cancellationToken = default)
     {
-        await ReferenceDataSeeder.SeedAsync(db, cancellationToken);
-        await EnsureUsersAsync(db, passwordHasher, cancellationToken);
+        await ReferenceDataSeeder.SeedAsync(db, clock, cancellationToken);
+        await EnsureUsersAsync(db, passwordHasher, clock, cancellationToken);
     }
 
     private static async Task EnsureUsersAsync(
         AppDbContext db,
         IPasswordHasher passwordHasher,
+        TimeProvider clock,
         CancellationToken cancellationToken)
     {
+        var now = clock.GetUtcNow();
+
         foreach (var (email, role) in DemoUsers)
         {
             if (await db.Users.AnyAsync(user => user.Email == email, cancellationToken))
@@ -45,14 +53,9 @@ public static class DemoDataSeeder
                 continue;
             }
 
-            db.Users.Add(new User
-            {
-                Email = email,
-                PasswordHash = passwordHasher.Hash(DemoPassword),
-                Role = role,
-                IsEmailConfirmed = true,
-                IsTrusted = false,
-            });
+            var user = new User(email, passwordHasher.Hash(DemoPassword), role, now);
+            user.ConfirmEmail(now);
+            db.Users.Add(user);
         }
 
         await db.SaveChangesAsync(cancellationToken);

@@ -479,13 +479,10 @@ public sealed class ClassifiedAdsApiTests : IClassFixture<ApiFactory>, IAsyncLif
             var db = provider.GetRequiredService<AppDbContext>();
             var passwordHasher = provider.GetRequiredService<IPasswordHasher>();
 
-            db.Users.Add(new User
-            {
-                Email = email,
-                PasswordHash = passwordHasher.Hash(Password),
-                Role = UserRole.Moderator,
-                IsEmailConfirmed = true,
-            });
+            db.Users.Add(TestData.CreateUser(
+                email,
+                UserRole.Moderator,
+                passwordHash: passwordHasher.Hash(Password)));
 
             await db.SaveChangesAsync(cancellationToken);
             return 0;
@@ -516,11 +513,11 @@ public sealed class ClassifiedAdsApiTests : IClassFixture<ApiFactory>, IAsyncLif
         await TestDatabase.WithContextAsync(_factory, async db =>
         {
             var stored = await db.Users.FirstAsync(candidate => candidate.Id == user.Id, cancellationToken);
-            stored.IsEmailConfirmed = true;
+            stored.ConfirmEmail(DateTimeOffset.UtcNow);
 
             if (trustedAuthor)
             {
-                stored.GrantTrust();
+                stored.GrantTrust(DateTimeOffset.UtcNow);
             }
 
             await db.SaveChangesAsync(cancellationToken);
@@ -534,12 +531,12 @@ public sealed class ClassifiedAdsApiTests : IClassFixture<ApiFactory>, IAsyncLif
         {
             var ct = TestContext.Current.CancellationToken;
             var suffix = Guid.NewGuid().ToString("N");
-            var section = new Category { Name = $"{SectionPrefix}{suffix}" };
+            var section = TestData.CreateSection($"{SectionPrefix}{suffix}");
             db.Categories.Add(section);
             await db.SaveChangesAsync(ct);
 
-            var subsection = new Category { Name = $"{SubsectionPrefix}{suffix}", ParentId = section.Id };
-            var city = new City { Name = $"{CityPrefix}{suffix}" };
+            var subsection = TestData.CreateSubsection(section, $"{SubsectionPrefix}{suffix}");
+            var city = TestData.CreateCity($"{CityPrefix}{suffix}");
             db.Categories.Add(subsection);
             db.Cities.Add(city);
             await db.SaveChangesAsync(ct);
@@ -557,18 +554,13 @@ public sealed class ClassifiedAdsApiTests : IClassFixture<ApiFactory>, IAsyncLif
         => await TestDatabase.WithContextAsync(_factory, async db =>
         {
             var ct = TestContext.Current.CancellationToken;
-            var ad = new Ad
-            {
-                AuthorId = authorId,
-                CategoryId = categoryId,
-                CityId = cityId,
-                Title = title,
-                Description = "Описание",
-                Price = 1000m,
-                Contacts = "+7 900 000-00-00",
-                Status = status,
-                PublishedAt = publishedAt,
-            };
+            var ad = TestData.CreateAd(
+                authorId,
+                categoryId,
+                cityId,
+                title,
+                status: status,
+                publishedAt: publishedAt);
 
             db.Ads.Add(ad);
             await db.SaveChangesAsync(ct);

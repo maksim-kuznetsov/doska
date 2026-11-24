@@ -122,53 +122,26 @@ public sealed class MediaMaintenanceTests : IClassFixture<ApiFactory>
         CancellationToken cancellationToken)
     {
         var suffix = Guid.NewGuid().ToString("N");
-        var author = new User
-        {
-            Email = $"media-cleanup-{suffix}@example.com",
-            PasswordHash = "test",
-            Role = UserRole.User,
-            IsEmailConfirmed = true,
-        };
-        var section = new Category { Name = $"Media cleanup section {suffix}", SortOrder = 1 };
-        var city = new City { Name = $"Media cleanup city {suffix}" };
+        var author = TestData.CreateUser($"media-cleanup-{suffix}@example.com", passwordHash: "test");
+        var section = TestData.CreateSection($"Media cleanup section {suffix}");
+        var city = TestData.CreateCity($"Media cleanup city {suffix}");
 
         db.Users.Add(author);
         db.Categories.Add(section);
         db.Cities.Add(city);
         await db.SaveChangesAsync(cancellationToken);
 
-        var subsection = new Category
-        {
-            Name = $"Media cleanup subsection {suffix}",
-            ParentId = section.Id,
-            SortOrder = 0,
-        };
+        var subsection = TestData.CreateSubsection(section, $"Media cleanup subsection {suffix}");
         db.Categories.Add(subsection);
         await db.SaveChangesAsync(cancellationToken);
 
-        var ad = new Ad
-        {
-            AuthorId = author.Id,
-            CategoryId = subsection.Id,
-            CityId = city.Id,
-            Title = $"Media cleanup ad {suffix}",
-            Description = "Описание",
-            Price = 1m,
-            Contacts = "+7 900 000-00-00",
-            Status = AdStatus.Active,
-            PublishedAt = DateTimeOffset.UtcNow,
-        };
-        ad.Photos.Add(new AdPhoto
-        {
-            AdId = ad.Id,
-            FileName = KeepFile,
-            ThumbnailFileName = KeepThumbnail,
-            ContentType = "image/png",
-            ByteSize = 4,
-            SortOrder = 1,
-            Width = 1,
-            Height = 1,
-        });
+        var ad = TestData.CreateAd(
+            author.Id,
+            subsection.Id,
+            city.Id,
+            $"Media cleanup ad {suffix}",
+            price: 1m);
+        ad.Photos.Add(TestData.CreatePhoto(ad.Id, KeepFile, KeepThumbnail));
 
         db.Ads.Add(ad);
         await db.SaveChangesAsync(cancellationToken);

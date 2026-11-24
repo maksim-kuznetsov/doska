@@ -98,34 +98,31 @@ public sealed class AdService(
 
         await EnsureDailyLimitAsync(author, now, cancellationToken);
 
-        var ad = new Ad
-        {
-            AuthorId = authorId,
-            CategoryId = category.Id,
-            CityId = city.Id,
-            Title = command.Title.Trim(),
-            Description = command.Description.Trim(),
-            Price = command.Price,
-            Contacts = command.Contacts.Trim(),
-            Status = author.IsTrusted ? AdStatus.Active : AdStatus.OnModeration,
-            PublishedAt = author.IsTrusted ? now : default,
-        };
+        var ad = new Ad(
+            authorId,
+            category.Id,
+            city.Id,
+            command.Title.Trim(),
+            command.Description.Trim(),
+            command.Price,
+            command.Contacts.Trim(),
+            author.IsTrusted,
+            now);
 
         for (var index = 0; index < photos.Count; index++)
         {
             var stored = await photoStorage.SaveAsync(ad.Id, photos[index], cancellationToken);
 
-            ad.Photos.Add(new AdPhoto
-            {
-                AdId = ad.Id,
-                FileName = stored.FileName,
-                ThumbnailFileName = stored.ThumbnailFileName,
-                ContentType = stored.ContentType,
-                ByteSize = stored.ByteSize,
-                SortOrder = index + 1,
-                Width = stored.Width,
-                Height = stored.Height,
-            });
+            ad.Photos.Add(new AdPhoto(
+                ad.Id,
+                stored.FileName,
+                stored.ThumbnailFileName,
+                stored.ContentType,
+                stored.ByteSize,
+                index + 1,
+                stored.Width,
+                stored.Height,
+                now));
         }
 
         db.Ads.Add(ad);
@@ -192,13 +189,15 @@ public sealed class AdService(
         ValidateCommand(command);
         var (city, category) = await ResolveCatalogAsync(command, cancellationToken);
 
-        ad.Title = command.Title.Trim();
-        ad.Description = command.Description.Trim();
-        ad.Price = command.Price;
-        ad.Contacts = command.Contacts.Trim();
-        ad.CityId = city.Id;
-        ad.CategoryId = category.Id;
-        ad.CompleteEdit(author.IsTrusted);
+        ad.UpdateDetails(
+            command.Title.Trim(),
+            command.Description.Trim(),
+            command.Price,
+            command.Contacts.Trim(),
+            city.Id,
+            category.Id,
+            author.IsTrusted,
+            clock.GetUtcNow());
 
         await db.SaveChangesAsync(cancellationToken);
         return ToSummary(ad);
@@ -233,7 +232,7 @@ public sealed class AdService(
     {
         var (ad, _) = await LoadOwnedAsync(adId, authorId, cancellationToken);
 
-        ad.MarkSold();
+        ad.MarkSold(clock.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
         return ToSummary(ad);
     }
@@ -270,7 +269,8 @@ public sealed class AdService(
     /// </summary>
     public async Task<int> ArchiveExpiredAsync(CancellationToken cancellationToken = default)
     {
-        var threshold = clock.GetUtcNow().AddDays(-Ad.LifetimeDays);
+        var now = clock.GetUtcNow();
+        var threshold = now.AddDays(-Ad.LifetimeDays);
 
         var expired = await db.Ads
             .Where(ad => ad.Status == AdStatus.Active && ad.PublishedAt <= threshold)
@@ -278,7 +278,7 @@ public sealed class AdService(
 
         foreach (var ad in expired)
         {
-            ad.Archive();
+            ad.Archive(now);
         }
 
         if (expired.Count > 0)
@@ -311,7 +311,7 @@ public sealed class AdService(
 
         foreach (var ad in expiring)
         {
-            ad.ReminderSentAt = now;
+            ad.MarkReminderSent(now);
 
             if (ad.Author is not null)
             {

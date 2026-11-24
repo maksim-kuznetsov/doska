@@ -31,7 +31,7 @@ public sealed class TrustService(IAppDbContext db, TimeProvider clock)
     public async Task<AuthenticatedUser> UnblockAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var user = await LoadAsync(userId, cancellationToken);
-        user.Unblock();
+        user.Unblock(clock.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
         return AuthenticatedUser.From(user);
     }
@@ -45,11 +45,11 @@ public sealed class TrustService(IAppDbContext db, TimeProvider clock)
 
         if (grant)
         {
-            user.GrantTrust();
+            user.GrantTrust(clock.GetUtcNow());
         }
         else
         {
-            user.RevokeTrust();
+            user.RevokeTrust(clock.GetUtcNow());
         }
 
         await db.SaveChangesAsync(cancellationToken);

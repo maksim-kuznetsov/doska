@@ -279,13 +279,9 @@ public sealed class AdSearchApiTests : IClassFixture<ApiFactory>, IAsyncLifetime
             var db = provider.GetRequiredService<AppDbContext>();
             var passwordHasher = provider.GetRequiredService<IPasswordHasher>();
 
-            var author = new User
-            {
-                Email = $"search-{Guid.NewGuid():N}@example.com",
-                PasswordHash = passwordHasher.Hash("secret123"),
-                Role = UserRole.User,
-                IsEmailConfirmed = true,
-            };
+            var author = TestData.CreateUser(
+                $"search-{Guid.NewGuid():N}@example.com",
+                passwordHash: passwordHasher.Hash("secret123"));
 
             db.Users.Add(author);
             await db.SaveChangesAsync(ct);
@@ -301,14 +297,14 @@ public sealed class AdSearchApiTests : IClassFixture<ApiFactory>, IAsyncLifetime
         return await TestDatabase.WithContextAsync(_factory, async db =>
         {
             var suffix = Guid.NewGuid().ToString("N");
-            var section = new Category { Name = $"{SectionPrefix}{suffix}" };
+            var section = TestData.CreateSection($"{SectionPrefix}{suffix}");
             db.Categories.Add(section);
             await db.SaveChangesAsync(ct);
 
-            var firstSubsection = new Category { Name = $"{SubsectionPrefix}A-{suffix}", ParentId = section.Id };
-            var secondSubsection = new Category { Name = $"{SubsectionPrefix}B-{suffix}", ParentId = section.Id };
-            var firstCity = new City { Name = $"{CityPrefix}1-{suffix}" };
-            var secondCity = new City { Name = $"{CityPrefix}2-{suffix}" };
+            var firstSubsection = TestData.CreateSubsection(section, $"{SubsectionPrefix}A-{suffix}");
+            var secondSubsection = TestData.CreateSubsection(section, $"{SubsectionPrefix}B-{suffix}");
+            var firstCity = TestData.CreateCity($"{CityPrefix}1-{suffix}");
+            var secondCity = TestData.CreateCity($"{CityPrefix}2-{suffix}");
 
             db.Categories.AddRange(firstSubsection, secondSubsection);
             db.Cities.AddRange(firstCity, secondCity);
@@ -332,18 +328,15 @@ public sealed class AdSearchApiTests : IClassFixture<ApiFactory>, IAsyncLifetime
 
         return await TestDatabase.WithContextAsync(_factory, async db =>
         {
-            var ad = new Ad
-            {
-                AuthorId = authorId,
-                CategoryId = categoryId,
-                CityId = cityId,
-                Title = title,
-                Description = description,
-                Price = price,
-                Contacts = "+7 900 000-00-00",
-                Status = status,
-                PublishedAt = publishedAt ?? DateTimeOffset.UtcNow,
-            };
+            var ad = TestData.CreateAd(
+                authorId,
+                categoryId,
+                cityId,
+                title,
+                description,
+                price,
+                status: status,
+                publishedAt: publishedAt);
 
             db.Ads.Add(ad);
             await db.SaveChangesAsync(ct);

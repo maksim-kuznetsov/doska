@@ -37,13 +37,10 @@ public sealed class ForwardedHeadersTests
         var email = $"forwarded-{Guid.NewGuid():N}@example.com";
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        db.Users.Add(new User
-        {
-            Email = email,
-            PasswordHash = hasher.Hash(Password),
-            Role = UserRole.User,
-            IsEmailConfirmed = true,
-        });
+        db.Users.Add(TestData.CreateUser(
+            email,
+            UserRole.User,
+            passwordHash: hasher.Hash(Password)));
         await db.SaveChangesAsync(ct);
 
         try

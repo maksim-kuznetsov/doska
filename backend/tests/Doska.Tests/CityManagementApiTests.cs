@@ -218,13 +218,10 @@ public sealed class CityManagementApiTests : IClassFixture<ApiFactory>, IAsyncLi
             var db = provider.GetRequiredService<AppDbContext>();
             var passwordHasher = provider.GetRequiredService<IPasswordHasher>();
 
-            db.Users.Add(new User
-            {
-                Email = email,
-                PasswordHash = passwordHasher.Hash(Password),
-                Role = role,
-                IsEmailConfirmed = true,
-            });
+            db.Users.Add(TestData.CreateUser(
+                email,
+                role,
+                passwordHash: passwordHasher.Hash(Password)));
 
             await db.SaveChangesAsync();
             return 0;
@@ -243,34 +240,23 @@ public sealed class CityManagementApiTests : IClassFixture<ApiFactory>, IAsyncLi
             var passwordHasher = provider.GetRequiredService<IPasswordHasher>();
             var suffix = Guid.NewGuid().ToString("N");
 
-            var author = new User
-            {
-                Email = $"city-author-{suffix}@example.com",
-                PasswordHash = passwordHasher.Hash(Password),
-                Role = UserRole.User,
-                IsEmailConfirmed = true,
-            };
-            var section = new Category { Name = $"{CategoryPrefix}{suffix}" };
+            var author = TestData.CreateUser(
+                $"city-author-{suffix}@example.com",
+                passwordHash: passwordHasher.Hash(Password));
+            var section = TestData.CreateSection($"{CategoryPrefix}{suffix}");
             db.Categories.Add(section);
             await db.SaveChangesAsync(ct);
 
-            var subsection = new Category { Name = $"{CategoryPrefix}под-{suffix}", ParentId = section.Id };
+            var subsection = TestData.CreateSubsection(section, $"{CategoryPrefix}под-{suffix}");
             db.Categories.Add(subsection);
             db.Users.Add(author);
             await db.SaveChangesAsync(ct);
 
-            db.Ads.Add(new Ad
-            {
-                AuthorId = author.Id,
-                CategoryId = subsection.Id,
-                CityId = cityId,
-                Title = $"{AdPrefix}{marker}",
-                Description = "Описание",
-                Price = 1000m,
-                Contacts = "+7 900 000-00-00",
-                Status = AdStatus.Active,
-                PublishedAt = DateTimeOffset.UtcNow,
-            });
+            db.Ads.Add(TestData.CreateAd(
+                author.Id,
+                subsection.Id,
+                cityId,
+                $"{AdPrefix}{marker}"));
 
             await db.SaveChangesAsync(ct);
             return 0;

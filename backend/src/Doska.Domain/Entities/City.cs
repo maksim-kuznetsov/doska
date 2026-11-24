@@ -7,18 +7,32 @@ public class City : Entity
     public const int MaxNameLength = 200;
 
     /// <summary>Название города; уникально.</summary>
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; private set; } = string.Empty;
 
     /// <summary>Признак доступности города для выбора в объявлениях.</summary>
-    public bool IsActive { get; set; } = true;
+    public bool IsActive { get; private set; } = true;
 
     /// <summary>Объявления города.</summary>
-    public ICollection<Ad> Ads { get; set; } = new List<Ad>();
+    public ICollection<Ad> Ads { get; } = new List<Ad>();
+
+    /// <summary>Создаёт пустой город: используется EF Core при чтении из базы.</summary>
+    private City()
+    {
+    }
+
+    /// <summary>Создаёт город.</summary>
+    /// <param name="name">Название города.</param>
+    /// <param name="now">Момент создания.</param>
+    /// <exception cref="ArgumentException">Название пустое или слишком длинное.</exception>
+    public City(string name, DateTimeOffset now)
+        : base(now)
+        => Rename(name, now);
 
     /// <summary>Переименовывает город.</summary>
     /// <param name="name">Новое название.</param>
+    /// <param name="now">Момент изменения.</param>
     /// <exception cref="ArgumentException">Название пустое или слишком длинное.</exception>
-    public void Rename(string name)
+    public void Rename(string name, DateTimeOffset now)
     {
         var trimmed = (name ?? string.Empty).Trim();
 
@@ -35,11 +49,22 @@ public class City : Entity
         }
 
         Name = trimmed;
+        MarkUpdated(now);
     }
 
     /// <summary>Делает город доступным для выбора.</summary>
-    public void Activate() => IsActive = true;
+    /// <param name="now">Момент изменения.</param>
+    public void Activate(DateTimeOffset now)
+    {
+        IsActive = true;
+        MarkUpdated(now);
+    }
 
     /// <summary>Скрывает город из выбора, не затрагивая объявления.</summary>
-    public void Deactivate() => IsActive = false;
+    /// <param name="now">Момент изменения.</param>
+    public void Deactivate(DateTimeOffset now)
+    {
+        IsActive = false;
+        MarkUpdated(now);
+    }
 }

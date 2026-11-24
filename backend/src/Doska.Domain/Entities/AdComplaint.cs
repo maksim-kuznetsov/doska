@@ -6,31 +6,49 @@ namespace Doska.Domain.Entities;
 public class AdComplaint : Entity
 {
     /// <summary>Объявление, на которое подана жалоба.</summary>
-    public Guid AdId { get; set; }
+    public Guid AdId { get; private set; }
 
     /// <summary>Объявление, на которое подана жалоба.</summary>
-    public Ad? Ad { get; set; }
+    public Ad? Ad { get; private set; }
 
     /// <summary>Автор жалобы.</summary>
-    public Guid AuthorId { get; set; }
+    public Guid AuthorId { get; private set; }
 
     /// <summary>Автор жалобы.</summary>
-    public User? Author { get; set; }
+    public User? Author { get; private set; }
 
     /// <summary>Текст жалобы.</summary>
-    public string Reason { get; set; } = string.Empty;
+    public string Reason { get; private set; } = string.Empty;
 
     /// <summary>Состояние жалобы.</summary>
-    public ComplaintStatus Status { get; set; } = ComplaintStatus.Open;
+    public ComplaintStatus Status { get; private set; } = ComplaintStatus.Open;
 
     /// <summary>Момент закрытия жалобы; <c>null</c> — жалоба открыта.</summary>
-    public DateTimeOffset? ClosedAt { get; set; }
+    public DateTimeOffset? ClosedAt { get; private set; }
 
     /// <summary>Модератор, закрывший жалобу.</summary>
-    public Guid? ClosedByUserId { get; set; }
+    public Guid? ClosedByUserId { get; private set; }
 
     /// <summary>Модератор, закрывший жалобу.</summary>
-    public User? ClosedByUser { get; set; }
+    public User? ClosedByUser { get; private set; }
+
+    /// <summary>Создаёт пустую жалобу: используется EF Core при чтении из базы.</summary>
+    private AdComplaint()
+    {
+    }
+
+    /// <summary>Создаёт открытую жалобу на объявление.</summary>
+    /// <param name="adId">Объявление, на которое подана жалоба.</param>
+    /// <param name="authorId">Автор жалобы.</param>
+    /// <param name="reason">Текст жалобы.</param>
+    /// <param name="now">Момент подачи.</param>
+    public AdComplaint(Guid adId, Guid authorId, string reason, DateTimeOffset now)
+        : base(now)
+    {
+        AdId = adId;
+        AuthorId = authorId;
+        Reason = reason;
+    }
 
     /// <summary>
     /// Закрывает жалобу решением модератора.
@@ -48,5 +66,6 @@ public class AdComplaint : Entity
         Status = ComplaintStatus.Closed;
         ClosedByUserId = moderatorId;
         ClosedAt = now;
+        MarkUpdated(now);
     }
 }

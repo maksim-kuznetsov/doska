@@ -9,7 +9,7 @@ namespace Doska.Application.Locations;
 public sealed record CityView(Guid Id, string Name, bool IsActive);
 
 /// <summary>Управление справочником городов.</summary>
-public sealed class CityService(IAppDbContext db)
+public sealed class CityService(IAppDbContext db, TimeProvider clock)
 {
     /// <summary>Полный список городов для администратора, включая неактивные.</summary>
     public async Task<IReadOnlyList<CityView>> GetAdminListAsync(
@@ -23,7 +23,7 @@ public sealed class CityService(IAppDbContext db)
     public async Task<CityView> CreateAsync(string name, CancellationToken cancellationToken = default)
     {
         var normalizedName = await NormalizeAvailableNameAsync(name, null, cancellationToken);
-        var city = new City { Name = normalizedName, IsActive = true };
+        var city = new City(normalizedName, clock.GetUtcNow());
 
         db.Cities.Add(city);
         await db.SaveChangesAsync(cancellationToken);
@@ -40,7 +40,7 @@ public sealed class CityService(IAppDbContext db)
         var city = await LoadAsync(id, cancellationToken);
         var normalizedName = await NormalizeAvailableNameAsync(name, id, cancellationToken);
 
-        city.Rename(normalizedName);
+        city.Rename(normalizedName, clock.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
 
         return new CityView(city.Id, city.Name, city.IsActive);
@@ -50,7 +50,7 @@ public sealed class CityService(IAppDbContext db)
     public async Task<CityView> ActivateAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var city = await LoadAsync(id, cancellationToken);
-        city.Activate();
+        city.Activate(clock.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
         return new CityView(city.Id, city.Name, city.IsActive);
     }
@@ -59,7 +59,7 @@ public sealed class CityService(IAppDbContext db)
     public async Task<CityView> DeactivateAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var city = await LoadAsync(id, cancellationToken);
-        city.Deactivate();
+        city.Deactivate(clock.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
         return new CityView(city.Id, city.Name, city.IsActive);
     }

@@ -95,7 +95,7 @@ public sealed class ExtendedCatalogSeedTests : IClassFixture<ApiFactory>, IAsync
         await EnsureDatabaseAsync();
         var ct = TestContext.Current.CancellationToken;
 
-        await TestDatabase.WithContextAsync(_factory, db => ReferenceDataSeeder.SeedAsync(db, ct));
+        await TestDatabase.WithContextAsync(_factory, db => ReferenceDataSeeder.SeedAsync(db, TimeProvider.System, ct));
         await SeedAsync(ct);
         var second = await SeedAsync(ct);
 
@@ -184,7 +184,7 @@ public sealed class ExtendedCatalogSeedTests : IClassFixture<ApiFactory>, IAsync
     private Task<CatalogSeedResult> SeedAsync(CancellationToken cancellationToken)
         => TestDatabase.WithContextAsync(
             _factory,
-            db => ExtendedCatalogSeeder.SeedAsync(db, cancellationToken));
+            db => ExtendedCatalogSeeder.SeedAsync(db, TimeProvider.System, cancellationToken));
 
     private async Task EnsureDatabaseAsync()
     {
@@ -208,8 +208,8 @@ public sealed class ExtendedCatalogSeedTests : IClassFixture<ApiFactory>, IAsync
         await TestDatabase.WithContextAsync(_factory, async db =>
         {
             var stored = await db.Users.FirstAsync(candidate => candidate.Id == user.Id, cancellationToken);
-            stored.IsEmailConfirmed = true;
-            stored.GrantTrust();
+            stored.ConfirmEmail(DateTimeOffset.UtcNow);
+            stored.GrantTrust(DateTimeOffset.UtcNow);
             await db.SaveChangesAsync(cancellationToken);
         });
     }

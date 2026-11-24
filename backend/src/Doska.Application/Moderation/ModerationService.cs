@@ -38,7 +38,7 @@ public sealed class ModerationService(IAppDbContext db, IEmailSender email, Time
         ad.Approve(clock.GetUtcNow());
 
         var author = await db.Users.FirstAsync(user => user.Id == ad.AuthorId, cancellationToken);
-        var trustGranted = !author.IsTrusted && author.RegisterApprovedAd();
+        var trustGranted = !author.IsTrusted && author.RegisterApprovedAd(clock.GetUtcNow());
 
         await db.SaveChangesAsync(cancellationToken);
 
@@ -53,7 +53,7 @@ public sealed class ModerationService(IAppDbContext db, IEmailSender email, Time
     {
         var ad = await LoadAdAsync(adId, cancellationToken);
 
-        ad.Reject(reason);
+        ad.Reject(reason, clock.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
 
         var author = await db.Users.FirstAsync(user => user.Id == ad.AuthorId, cancellationToken);
@@ -74,7 +74,7 @@ public sealed class ModerationService(IAppDbContext db, IEmailSender email, Time
     {
         var ad = await LoadAdAsync(adId, cancellationToken);
 
-        ad.Hide(reason);
+        ad.Hide(reason, clock.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
 
         var author = await db.Users.FirstAsync(user => user.Id == ad.AuthorId, cancellationToken);

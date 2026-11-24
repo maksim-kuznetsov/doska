@@ -17,7 +17,7 @@ public sealed record CategorySectionView(
     IReadOnlyList<CategoryItemView> Subsections);
 
 /// <summary>Управление разделами и подразделами каталога.</summary>
-public sealed class CategoryService(IAppDbContext db)
+public sealed class CategoryService(IAppDbContext db, TimeProvider clock)
 {
     /// <summary>Полное дерево для администратора, включая неактивные элементы.</summary>
     public async Task<IReadOnlyList<CategorySectionView>> GetAdminTreeAsync(
@@ -78,7 +78,7 @@ public sealed class CategoryService(IAppDbContext db)
         CancellationToken cancellationToken = default)
     {
         var normalizedName = await NormalizeAvailableNameAsync(name, null, cancellationToken);
-        var section = Category.CreateSection(normalizedName, sortOrder);
+        var section = new Category(normalizedName, sortOrder, clock.GetUtcNow());
 
         db.Categories.Add(section);
         await db.SaveChangesAsync(cancellationToken);
@@ -108,7 +108,7 @@ public sealed class CategoryService(IAppDbContext db)
         }
 
         var normalizedName = await NormalizeAvailableNameAsync(name, null, cancellationToken);
-        var subsection = Category.CreateSubsection(section, normalizedName, sortOrder);
+        var subsection = new Category(normalizedName, sortOrder, section, clock.GetUtcNow());
 
         db.Categories.Add(subsection);
         await db.SaveChangesAsync(cancellationToken);
@@ -126,8 +126,9 @@ public sealed class CategoryService(IAppDbContext db)
         var category = await LoadAsync(id, cancellationToken);
         var normalizedName = await NormalizeAvailableNameAsync(name, id, cancellationToken);
 
-        category.Rename(normalizedName);
-        category.SetSortOrder(sortOrder);
+        var now = clock.GetUtcNow();
+        category.Rename(normalizedName, now);
+        category.SetSortOrder(sortOrder, now);
 
         await db.SaveChangesAsync(cancellationToken);
         return ToItemView(category);
@@ -139,7 +140,7 @@ public sealed class CategoryService(IAppDbContext db)
         CancellationToken cancellationToken = default)
     {
         var category = await LoadAsync(id, cancellationToken);
-        category.Activate();
+        category.Activate(clock.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
         return ToItemView(category);
     }
@@ -150,7 +151,7 @@ public sealed class CategoryService(IAppDbContext db)
         CancellationToken cancellationToken = default)
     {
         var category = await LoadAsync(id, cancellationToken);
-        category.Deactivate();
+        category.Deactivate(clock.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
         return ToItemView(category);
     }

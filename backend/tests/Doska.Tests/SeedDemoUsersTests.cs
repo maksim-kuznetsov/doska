@@ -33,8 +33,8 @@ public sealed class SeedDemoUsersTests : IClassFixture<ApiFactory>
             var db = provider.GetRequiredService<AppDbContext>();
             var passwordHasher = provider.GetRequiredService<IPasswordHasher>();
 
-            await DemoDataSeeder.SeedAsync(db, passwordHasher, ct);
-            await DemoDataSeeder.SeedAsync(db, passwordHasher, ct);
+            await DemoDataSeeder.SeedAsync(db, passwordHasher, TimeProvider.System, ct);
+            await DemoDataSeeder.SeedAsync(db, passwordHasher, TimeProvider.System, ct);
 
             return 0;
         });

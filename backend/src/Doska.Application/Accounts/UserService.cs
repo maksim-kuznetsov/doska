@@ -15,7 +15,7 @@ public sealed record AdminUserView(
     bool IsEmailConfirmed);
 
 /// <summary>Административное управление учётными записями.</summary>
-public sealed class UserService(IAppDbContext db)
+public sealed class UserService(IAppDbContext db, TimeProvider clock)
 {
     /// <summary>Список пользователей для администратора.</summary>
     public async Task<IReadOnlyList<AdminUserView>> GetListAsync(
@@ -45,7 +45,7 @@ public sealed class UserService(IAppDbContext db)
         var user = await db.Users.FirstOrDefaultAsync(candidate => candidate.Id == userId, cancellationToken)
             ?? throw new ServiceException(ServiceErrorKind.NotFound, "Пользователь не найден.");
 
-        user.Role = parsed;
+        user.ChangeRole(parsed, clock.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
 
         return new AdminUserView(

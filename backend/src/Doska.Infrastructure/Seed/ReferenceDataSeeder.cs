@@ -11,13 +11,22 @@ namespace Doska.Infrastructure.Seed;
 public static class ReferenceDataSeeder
 {
     /// <summary>Добавляет города и категории, если их ещё нет.</summary>
-    public static async Task SeedAsync(AppDbContext db, CancellationToken cancellationToken = default)
+    /// <param name="db">Контекст базы данных.</param>
+    /// <param name="clock">Источник времени для отметок создания.</param>
+    /// <param name="cancellationToken">Токен отмены.</param>
+    public static async Task SeedAsync(
+        AppDbContext db,
+        TimeProvider clock,
+        CancellationToken cancellationToken = default)
     {
-        await EnsureCitiesAsync(db, cancellationToken);
-        await EnsureCategoriesAsync(db, cancellationToken);
+        await EnsureCitiesAsync(db, clock, cancellationToken);
+        await EnsureCategoriesAsync(db, clock, cancellationToken);
     }
 
-    private static async Task EnsureCitiesAsync(AppDbContext db, CancellationToken cancellationToken)
+    private static async Task EnsureCitiesAsync(
+        AppDbContext db,
+        TimeProvider clock,
+        CancellationToken cancellationToken)
     {
         var names = new[] { "Москва", "Санкт-Петербург", "Новосибирск" };
 
@@ -25,14 +34,17 @@ public static class ReferenceDataSeeder
         {
             if (!await db.Cities.AnyAsync(city => city.Name == name, cancellationToken))
             {
-                db.Cities.Add(new City { Name = name, IsActive = true });
+                db.Cities.Add(new City(name, clock.GetUtcNow()));
             }
         }
 
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static async Task EnsureCategoriesAsync(AppDbContext db, CancellationToken cancellationToken)
+    private static async Task EnsureCategoriesAsync(
+        AppDbContext db,
+        TimeProvider clock,
+        CancellationToken cancellationToken)
     {
         var sections = new (string Name, int SortOrder, string[] Subsections)[]
         {
@@ -49,7 +61,7 @@ public static class ReferenceDataSeeder
 
             if (section is null)
             {
-                section = new Category { Name = sectionName, SortOrder = sortOrder, IsActive = true };
+                section = new Category(sectionName, sortOrder, clock.GetUtcNow());
                 db.Categories.Add(section);
                 await db.SaveChangesAsync(cancellationToken);
             }
@@ -62,12 +74,7 @@ public static class ReferenceDataSeeder
 
                 if (!exists)
                 {
-                    db.Categories.Add(new Category
-                    {
-                        Name = subsectionName,
-                        ParentId = section.Id,
-                        IsActive = true,
-                    });
+                    db.Categories.Add(new Category(subsectionName, 0, section, clock.GetUtcNow()));
                 }
             }
 

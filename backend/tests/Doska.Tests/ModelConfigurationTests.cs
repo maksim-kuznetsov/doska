@@ -24,7 +24,7 @@ public sealed class ModelConfigurationTests : IDisposable
             .UseSnakeCaseNamingConvention()
             .Options;
 
-        _context = new AppDbContext(options, TimeProvider.System);
+        _context = new AppDbContext(options);
     }
 
     /// <summary>

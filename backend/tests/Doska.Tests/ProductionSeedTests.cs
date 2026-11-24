@@ -109,7 +109,7 @@ public sealed class ProductionSeedTests : IClassFixture<ApiFactory>
     {
         return TestDatabase.WithContextAsync(
             _factory,
-            db => ReferenceDataSeeder.SeedAsync(db, cancellationToken));
+            db => ReferenceDataSeeder.SeedAsync(db, TimeProvider.System, cancellationToken));
     }
 
     private async Task<bool> CreateAdminAsync(string email, string password, CancellationToken cancellationToken)
@@ -118,7 +118,13 @@ public sealed class ProductionSeedTests : IClassFixture<ApiFactory>
         {
             var db = provider.GetRequiredService<AppDbContext>();
             var hasher = provider.GetRequiredService<IPasswordHasher>();
-            return await AdminSeeder.CreateOrUpdateAsync(db, hasher, email, password, cancellationToken);
+            return await AdminSeeder.CreateOrUpdateAsync(
+                db,
+                hasher,
+                email,
+                password,
+                TimeProvider.System,
+                cancellationToken);
         });
     }
 

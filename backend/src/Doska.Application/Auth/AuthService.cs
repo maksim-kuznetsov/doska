@@ -61,13 +61,11 @@ public sealed class AuthService(
                 "Не удалось завершить регистрацию. Проверьте данные и попробуйте снова.");
         }
 
-        var user = new User
-        {
-            Email = normalizedEmail,
-            PasswordHash = passwordHasher.Hash(password),
-            Role = UserRole.User,
-            IsEmailConfirmed = false,
-        };
+        var user = new User(
+            normalizedEmail,
+            passwordHasher.Hash(password),
+            UserRole.User,
+            clock.GetUtcNow());
 
         db.Users.Add(user);
         await db.SaveChangesAsync(cancellationToken);
@@ -123,12 +121,14 @@ public sealed class AuthService(
             throw new ServiceException(ServiceErrorKind.Validation, "Ссылка подтверждения недействительна или устарела.");
         }
 
+        var now = clock.GetUtcNow();
+
         if (token.User is not null)
         {
-            token.User.IsEmailConfirmed = true;
+            token.User.ConfirmEmail(now);
         }
 
-        token.UsedAt = clock.GetUtcNow();
+        token.MarkUsed(now);
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -167,7 +167,7 @@ public sealed class AuthService(
 
         foreach (var token in pending)
         {
-            token.UsedAt = now;
+            token.MarkUsed(now);
         }
 
         var rawToken = CreateToken(user.Id, TokenPurpose.EmailConfirmation, ConfirmationTokenLifetime);
@@ -210,7 +210,7 @@ public sealed class AuthService(
 
         foreach (var token in pending)
         {
-            token.UsedAt = now;
+            token.MarkUsed(now);
         }
 
         var rawToken = CreateToken(user.Id, TokenPurpose.PasswordReset, ResetTokenLifetime);
@@ -252,12 +252,14 @@ public sealed class AuthService(
                 "Ссылка сброса недействительна или устарела. Запросите новую.");
         }
 
+        var now = clock.GetUtcNow();
+
         if (token.User is not null)
         {
-            token.User.PasswordHash = passwordHasher.Hash(password);
+            token.User.SetPassword(passwordHasher.Hash(password), now);
         }
 
-        token.UsedAt = clock.GetUtcNow();
+        token.MarkUsed(now);
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -278,13 +280,13 @@ public sealed class AuthService(
     private string CreateToken(Guid userId, TokenPurpose purpose, TimeSpan lifetime)
     {
         var rawToken = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32));
-        db.UserTokens.Add(new UserToken
-        {
-            UserId = userId,
-            TokenHash = TokenHasher.Hash(rawToken),
-            Purpose = purpose,
-            ExpiresAt = clock.GetUtcNow().Add(lifetime),
-        });
+        var now = clock.GetUtcNow();
+        db.UserTokens.Add(new UserToken(
+            userId,
+            TokenHasher.Hash(rawToken),
+            purpose,
+            now.Add(lifetime),
+            now));
 
         return rawToken;
     }
