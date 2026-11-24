@@ -3,6 +3,7 @@ import { ref } from 'vue'
 
 import type { ModerationQueueItem } from '../api/client'
 import AppButton from './AppButton.vue'
+import TextAreaField from './TextAreaField.vue'
 
 /** Карточка очереди проверки: причина и решение модератора. */
 const props = defineProps<{ item: ModerationQueueItem }>()
@@ -43,10 +44,12 @@ function formatDate(value: string): string {
       </span>
     </div>
 
-    <label class="field">
-      <span class="field__label">Причина отклонения или скрытия</span>
-      <textarea v-model="reason" class="input input--textarea" rows="2"></textarea>
-    </label>
+    <TextAreaField
+      v-model="reason"
+      :input-id="`moderation-reason-${item.id}`"
+      label="Причина отклонения или скрытия"
+      :rows="2"
+    />
 
     <div class="moderation-card__actions">
       <AppButton variant="primary" size="compact" @click="emit('approve', item.id)">

@@ -34,13 +34,6 @@
   box-shadow: var(--shadow-sm);
 }
 
-.divider {
-  height: 1px;
-  margin: var(--space-2) 0;
-  border: 0;
-  background: var(--color-border);
-}
-
 /* Кнопки */
 .btn {
   display: inline-flex;
@@ -255,7 +248,7 @@
 }
 
 .field--error .input:focus {
-  box-shadow: 0 0 0 3px rgb(255 97 99 / 30%);
+  box-shadow: var(--focus-ring);
 }
 
 /* Секции формы */
@@ -595,12 +588,12 @@
 
 .status-badge--on-moderation {
   background: var(--color-warning-soft);
-  color: #8a5a00;
+  color: var(--color-text-warning);
 }
 
 .status-badge--active {
   background: var(--color-success-soft);
-  color: #4f7011;
+  color: var(--color-text-success);
 }
 
 .status-badge--rejected {
@@ -615,7 +608,7 @@
 
 .status-badge--sold {
   background: var(--color-accent-soft);
-  color: #6c3fc7;
+  color: var(--color-text-accent);
 }
 
 .status-badge--archived {
@@ -637,7 +630,7 @@
 .message--success {
   border-color: var(--color-success);
   background: var(--color-success-soft);
-  color: #3f5c0c;
+  color: var(--color-text-success-strong);
 }
 
 .message--error {
@@ -649,13 +642,13 @@
 .message--info {
   border-color: var(--color-primary);
   background: var(--color-primary-soft);
-  color: #005f8f;
+  color: var(--color-text-info);
 }
 
 .message--warning {
   border-color: var(--color-warning);
   background: var(--color-warning-soft);
-  color: #7a4f00;
+  color: var(--color-text-warning-strong);
 }
 
 .message__icon {
@@ -862,7 +855,7 @@
 }
 
 .city-select__select {
-  min-height: 2.5rem;
+  min-height: var(--space-10);
   font-size: var(--font-size-sm);
 }
 
@@ -923,7 +916,7 @@
 
 .price-range__separator {
   width: 1px;
-  height: 1.5rem;
+  height: var(--space-6);
   background: var(--color-border);
 }
 
@@ -1194,8 +1187,8 @@
 }
 
 .photo-viewer__thumb img {
-  width: 4rem;
-  height: 3rem;
+  width: var(--space-16);
+  height: var(--space-12);
   object-fit: cover;
   border-radius: var(--radius-sm);
 }
@@ -1234,6 +1227,14 @@
   gap: var(--space-2);
 }
 
+/* Просмотр письма в административном ящике */
+.outbox-content {
+  margin: 0;
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* Подсказки к паролю */
 .password-hints {
   display: grid;
@@ -1255,7 +1256,7 @@
 }
 
 .password-hints__item--met {
-  color: #4f7011;
+  color: var(--color-text-success);
 }
 
 .password-hints__item--unmet {
@@ -1277,7 +1278,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  min-height: 2.5rem;
+  min-height: var(--space-10);
   padding: var(--space-1) var(--space-3);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);

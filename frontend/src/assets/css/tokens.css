@@ -34,6 +34,14 @@
   --color-focus: #00aaff;
   --color-overlay: rgb(0 0 0 / 45%);
 
+  /* Текст на мягких фонах состояний */
+  --color-text-success: #4f7011;
+  --color-text-success-strong: #3f5c0c;
+  --color-text-warning: #8a5a00;
+  --color-text-warning-strong: #7a4f00;
+  --color-text-accent: #6c3fc7;
+  --color-text-info: #005f8f;
+
   /* Типографика */
   --font-family: 'Avito Sans', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --font-size-xs: 0.75rem;
@@ -77,14 +85,11 @@
 
   /* Состояния и движение */
   --opacity-disabled: 0.5;
-  --opacity-muted: 0.75;
   --duration-fast: 120ms;
   --duration-normal: 180ms;
   --focus-ring: 0 0 0 3px rgb(0 170 255 / 35%);
 
-  /* Раскладка и точки перелома (используются в media-запросах) */
-  --breakpoint-mobile: 768px;
-  --breakpoint-tablet: 1024px;
+  /* Раскладка. Точки перелома задаются литералами в media-запросах: 768px — мобильная, 1024px — планшетная. */
   --container-max: 74rem;
   --header-height: 4rem;
   --category-strip-height: 2.75rem;

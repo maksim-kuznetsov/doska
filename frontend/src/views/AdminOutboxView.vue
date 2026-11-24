@@ -101,12 +101,3 @@ onMounted(load)
     </div>
   </section>
 </template>
-
-<style scoped>
-.outbox-content {
-  margin: 0;
-  font-family: monospace;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-</style>
