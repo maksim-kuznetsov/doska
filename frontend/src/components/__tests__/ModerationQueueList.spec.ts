@@ -7,8 +7,16 @@ const items = [
   {
     id: 'ad-1',
     title: 'Велосипед',
+    description: 'Аккуратный велосипед.',
+    price: 25000,
+    cityName: 'Москва',
+    categoryName: 'Автомобили',
+    contacts: '+7 900 000-00-00',
     authorEmail: 'author@example.com',
+    authorIsTrusted: false,
+    authorApprovedAdsCount: 2,
     submittedAt: '2026-11-18T10:00:00Z',
+    photos: [],
   },
 ]
 
@@ -19,6 +27,17 @@ describe('ModerationQueueList', () => {
     expect(wrapper.findAll('[data-test="queue-item"]')).toHaveLength(1)
     expect(wrapper.text()).toContain('Велосипед')
     expect(wrapper.text()).toContain('author@example.com')
+  })
+
+  it('показывает данные объявления и контекст автора', () => {
+    const wrapper = mount(ModerationQueueList, { props: { items } })
+
+    expect(wrapper.find('[data-test="admin-ad-preview"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('25000 ₽')
+    expect(wrapper.text()).toContain('Москва')
+    expect(wrapper.text()).toContain('Аккуратный велосипед.')
+    expect(wrapper.text()).toContain('без доверия')
+    expect(wrapper.text()).toContain('одобрено объявлений: 2')
   })
 
   it('сообщает о пустой очереди', () => {

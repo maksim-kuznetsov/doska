@@ -2,10 +2,11 @@
 import { ref } from 'vue'
 
 import type { ModerationQueueItem } from '../api/client'
+import AdminAdPreview from './AdminAdPreview.vue'
 import AppButton from './AppButton.vue'
 import TextAreaField from './TextAreaField.vue'
 
-/** Карточка очереди проверки: причина и решение модератора. */
+/** Карточка очереди проверки: данные объявления, контекст автора и решение модератора. */
 const props = defineProps<{ item: ModerationQueueItem }>()
 
 const emit = defineEmits<{
@@ -15,6 +16,12 @@ const emit = defineEmits<{
 }>()
 
 const reason = ref('')
+
+function formatTrust(item: ModerationQueueItem): string {
+  return item.authorIsTrusted
+    ? 'доверенный автор'
+    : `без доверия · одобрено объявлений: ${item.authorApprovedAdsCount}`
+}
 
 function submitReject(): void {
   const value = reason.value.trim()
@@ -40,9 +47,18 @@ function formatDate(value: string): string {
     <div class="moderation-card__head">
       <h3 class="moderation-card__title">{{ item.title }}</h3>
       <span class="moderation-card__meta">
-        {{ item.authorEmail }} · {{ formatDate(item.submittedAt) }}
+        {{ item.authorEmail }} · {{ formatTrust(item) }} · {{ formatDate(item.submittedAt) }}
       </span>
     </div>
+
+    <AdminAdPreview
+      :photos="item.photos"
+      :price="item.price"
+      :city-name="item.cityName"
+      :category-name="item.categoryName"
+      :description="item.description"
+      :contacts="item.contacts"
+    />
 
     <TextAreaField
       v-model="reason"

@@ -61,8 +61,16 @@ export interface CategoryOption {
 export interface ModerationQueueItem {
   id: string
   title: string
+  description: string
+  price: number
+  cityName: string
+  categoryName: string
+  contacts: string
   authorEmail: string
+  authorIsTrusted: boolean
+  authorApprovedAdsCount: number
   submittedAt: string
+  photos: AdPhotoSummary[]
 }
 
 export interface ModerationDecision {
@@ -75,8 +83,17 @@ export interface ComplaintQueueItem {
   id: string
   adId: string
   adTitle: string
+  adDescription: string
+  adPrice: number
+  adCityName: string
+  adCategoryName: string
+  adContacts: string
+  adStatus: string
+  adAuthorEmail: string
+  adPhotos: AdPhotoSummary[]
   authorEmail: string
   reason: string
+  openComplaintsCount: number
   createdAt: string
 }
 

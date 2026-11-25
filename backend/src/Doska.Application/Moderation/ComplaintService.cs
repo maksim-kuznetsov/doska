@@ -1,4 +1,5 @@
 using Doska.Application.Abstractions;
+using Doska.Application.Ads;
 using Doska.Application.Common;
 using Doska.Domain.Entities;
 using Doska.Domain.Enums;
@@ -6,13 +7,22 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Doska.Application.Moderation;
 
-/// <summary>Элемент очереди жалоб.</summary>
+/// <summary>Элемент очереди жалоб с данными объявления и сведениями о жалобе.</summary>
 public sealed record ComplaintQueueItem(
     Guid Id,
     Guid AdId,
     string AdTitle,
+    string AdDescription,
+    decimal AdPrice,
+    string AdCityName,
+    string AdCategoryName,
+    string AdContacts,
+    AdStatus AdStatus,
+    string AdAuthorEmail,
+    IReadOnlyList<AdPhotoSummary> AdPhotos,
     string AuthorEmail,
     string Reason,
+    int OpenComplaintsCount,
     DateTimeOffset CreatedAt);
 
 /// <summary>Подача, разбор и закрытие жалоб на объявления.</summary>
@@ -72,7 +82,7 @@ public sealed class ComplaintService(IAppDbContext db, IEmailSender email, TimeP
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    /// <summary>Очередь открытых жалоб: от самых старых к новым.</summary>
+    /// <summary>Очередь открытых жалоб: от самых старых к новым, с данными объявления.</summary>
     public async Task<IReadOnlyList<ComplaintQueueItem>> GetQueueAsync(
         CancellationToken cancellationToken = default)
         => await db.AdComplaints
@@ -82,8 +92,29 @@ public sealed class ComplaintService(IAppDbContext db, IEmailSender email, TimeP
                 complaint.Id,
                 complaint.AdId,
                 complaint.Ad!.Title,
+                complaint.Ad!.Description,
+                complaint.Ad!.Price,
+                complaint.Ad!.City!.Name,
+                complaint.Ad!.Category!.Name,
+                complaint.Ad!.Contacts,
+                complaint.Ad!.Status,
+                complaint.Ad!.Author!.Email,
+                complaint.Ad!.Photos
+                    .OrderBy(photo => photo.SortOrder)
+                    .Select(photo => new AdPhotoSummary(
+                        photo.Id,
+                        photo.FileName,
+                        photo.ThumbnailFileName,
+                        photo.ContentType,
+                        photo.ByteSize,
+                        photo.Width,
+                        photo.Height,
+                        photo.SortOrder))
+                    .ToList(),
                 complaint.Author!.Email,
                 complaint.Reason,
+                db.AdComplaints.Count(other =>
+                    other.AdId == complaint.AdId && other.Status == ComplaintStatus.Open),
                 complaint.CreatedAt))
             .ToListAsync(cancellationToken);
 

@@ -5,6 +5,7 @@ import type {
   AdCard as AdCardModel,
   AdPhotoSummary,
   AdSummary,
+  ComplaintQueueItem,
   ModerationQueueItem,
   SectionOption,
 } from '../api/client'
@@ -15,6 +16,7 @@ import Breadcrumbs from '../components/Breadcrumbs.vue'
 import CategoryMenu from '../components/CategoryMenu.vue'
 import CategoryStrip from '../components/CategoryStrip.vue'
 import CitySelect from '../components/CitySelect.vue'
+import ComplaintCard from '../components/ComplaintCard.vue'
 import EmptyState from '../components/EmptyState.vue'
 import FilterPanel from '../components/FilterPanel.vue'
 import FormErrors from '../components/FormErrors.vue'
@@ -123,10 +125,36 @@ const queue: ModerationQueueItem[] = [
   {
     id: 'ad-2',
     title: 'Ноутбук рабочий',
+    description: 'Рабочий ноутбук, состояние хорошее.',
+    price: 40000,
+    cityName: 'Москва',
+    categoryName: 'Электроника',
+    contacts: '+7 900 000-00-00',
     authorEmail: 'author@example.com',
+    authorIsTrusted: false,
+    authorApprovedAdsCount: 2,
     submittedAt: '2026-11-18T11:00:00Z',
+    photos: [],
   },
 ]
+
+const complaint: ComplaintQueueItem = {
+  id: 'complaint-1',
+  adId: 'ad-2',
+  adTitle: 'Ноутбук рабочий',
+  adDescription: 'Рабочий ноутбук, состояние хорошее.',
+  adPrice: 40000,
+  adCityName: 'Москва',
+  adCategoryName: 'Электроника',
+  adContacts: '+7 900 000-00-00',
+  adStatus: 'Active',
+  adAuthorEmail: 'author@example.com',
+  adPhotos: [],
+  authorEmail: 'reporter@example.com',
+  reason: 'Подозрительно',
+  openComplaintsCount: 2,
+  createdAt: '2026-11-20T11:00:00Z',
+}
 
 const guideFields = ref({ title: 'Название объявления', description: 'Описание', category: '', city: '', min: '1000', max: '50000' })
 const guidePhotos = ref<File[]>([])
@@ -308,6 +336,7 @@ const guideErrors = [
     <div class="guide__section">
       <h2 class="guide__section-title">Модерация</h2>
       <ModerationQueueList :items="queue" />
+      <ComplaintCard :complaint="complaint" />
     </div>
 
     <div class="guide__section">

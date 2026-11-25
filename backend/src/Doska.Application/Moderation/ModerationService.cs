@@ -1,4 +1,5 @@
 using Doska.Application.Abstractions;
+using Doska.Application.Ads;
 using Doska.Application.Common;
 using Doska.Domain.Entities;
 using Doska.Domain.Enums;
@@ -6,12 +7,20 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Doska.Application.Moderation;
 
-/// <summary>Элемент очереди проверки.</summary>
+/// <summary>Элемент очереди проверки с данными объявления и контекстом автора.</summary>
 public sealed record ModerationQueueItem(
     Guid Id,
     string Title,
+    string Description,
+    decimal Price,
+    string CityName,
+    string CategoryName,
+    string Contacts,
     string AuthorEmail,
-    DateTimeOffset SubmittedAt);
+    bool AuthorIsTrusted,
+    int AuthorApprovedAdsCount,
+    DateTimeOffset SubmittedAt,
+    IReadOnlyList<AdPhotoSummary> Photos);
 
 /// <summary>Результат решения модератора по объявлению.</summary>
 public sealed record ModerationDecision(Guid AdId, string Status, bool TrustGranted);
@@ -25,7 +34,30 @@ public sealed class ModerationService(IAppDbContext db, IEmailSender email, Time
         => await db.Ads
             .Where(ad => ad.Status == AdStatus.OnModeration)
             .OrderBy(ad => ad.CreatedAt)
-            .Select(ad => new ModerationQueueItem(ad.Id, ad.Title, ad.Author!.Email, ad.CreatedAt))
+            .Select(ad => new ModerationQueueItem(
+                ad.Id,
+                ad.Title,
+                ad.Description,
+                ad.Price,
+                ad.City!.Name,
+                ad.Category!.Name,
+                ad.Contacts,
+                ad.Author!.Email,
+                ad.Author!.IsTrusted,
+                ad.Author!.ApprovedAdsCount,
+                ad.CreatedAt,
+                ad.Photos
+                    .OrderBy(photo => photo.SortOrder)
+                    .Select(photo => new AdPhotoSummary(
+                        photo.Id,
+                        photo.FileName,
+                        photo.ThumbnailFileName,
+                        photo.ContentType,
+                        photo.ByteSize,
+                        photo.Width,
+                        photo.Height,
+                        photo.SortOrder))
+                    .ToList()))
             .ToListAsync(cancellationToken);
 
     /// <summary>Одобряет объявление и учитывает одобрение для доверия автора.</summary>

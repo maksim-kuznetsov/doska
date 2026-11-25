@@ -123,7 +123,19 @@ public sealed class ModerationApiTests : IClassFixture<ApiFactory>, IAsyncLifeti
             if (index == 0)
             {
                 var queue = await moderator.GetFromJsonAsync<List<QueuePayload>>("/api/moderation/queue", ct);
-                Assert.Contains(queue!, item => item.Id == ad.Id);
+                var queued = Assert.Single(queue!, item => item.Id == ad.Id);
+
+                Assert.Equal("Описание объявления", queued.Description);
+                Assert.Equal(1000m, queued.Price);
+                Assert.StartsWith("Город ", queued.CityName);
+                Assert.StartsWith("Подраздел ", queued.CategoryName);
+                Assert.Equal("+7 900 111-22-33", queued.Contacts);
+                Assert.Equal(authorEmail, queued.AuthorEmail);
+                Assert.False(queued.AuthorIsTrusted);
+                Assert.Equal(0, queued.AuthorApprovedAdsCount);
+
+                var photo = Assert.Single(queued.Photos);
+                Assert.Contains($"/api/media/photos/{ad.Id}/", photo.Url);
             }
 
             var response = await moderator.PostJsonAsync($"/api/moderation/ads/{ad.Id}/approve", null, ct);
@@ -255,11 +267,37 @@ public sealed class ModerationApiTests : IClassFixture<ApiFactory>, IAsyncLifeti
         var ownAd = await author.PostJsonAsync("/api/complaints", new { adId = ad.Id, reason = "Своё" }, ct);
         Assert.Equal(HttpStatusCode.Forbidden, ownAd.StatusCode);
 
+        using var secondReporter = _factory.CreateClient();
+        var secondEmail = UniqueEmail("reporter");
+        await RegisterAsync(secondReporter, secondEmail, ct);
+        await ConfirmEmailAsync(secondEmail);
+
+        var secondFiled = await secondReporter.PostJsonAsync(
+            "/api/complaints",
+            new { adId = ad.Id, reason = "Обман покупателя" },
+            ct);
+        Assert.Equal(HttpStatusCode.NoContent, secondFiled.StatusCode);
+
         using var moderator = _factory.CreateClient();
         await LoginAsync(moderator, await CreateStaffAsync(UserRole.Moderator), ct);
 
         var queue = await moderator.GetFromJsonAsync<List<ComplaintPayload>>("/api/complaints/queue", ct);
-        var complaint = Assert.Single(queue!, item => item.AdId == ad.Id);
+        var complaintsForAd = queue!.Where(item => item.AdId == ad.Id).ToList();
+        Assert.Equal(2, complaintsForAd.Count);
+
+        var complaint = complaintsForAd.Single(item => item.AuthorEmail == reporterEmail);
+        Assert.Equal("Подозрительно", complaint.Reason);
+        Assert.Equal("Описание объявления", complaint.AdDescription);
+        Assert.Equal(1000m, complaint.AdPrice);
+        Assert.StartsWith("Город ", complaint.AdCityName);
+        Assert.StartsWith("Подраздел ", complaint.AdCategoryName);
+        Assert.Equal("+7 900 111-22-33", complaint.AdContacts);
+        Assert.Equal("Active", complaint.AdStatus);
+        Assert.Equal(authorEmail, complaint.AdAuthorEmail);
+        Assert.Equal(2, complaint.OpenComplaintsCount);
+
+        var adPhoto = Assert.Single(complaint.AdPhotos);
+        Assert.Contains($"/api/media/photos/{ad.Id}/", adPhoto.Url);
 
         var resolved = await moderator.PostJsonAsync(
             $"/api/complaints/{complaint.Id}/resolve",
@@ -454,9 +492,46 @@ public sealed class ModerationApiTests : IClassFixture<ApiFactory>, IAsyncLifeti
 
     private sealed record AdPayload(Guid Id, string Status, string? ModerationReason);
 
-    private sealed record QueuePayload(Guid Id, string Title, string AuthorEmail, DateTimeOffset SubmittedAt);
+    private sealed record QueuePayload(
+        Guid Id,
+        string Title,
+        string Description,
+        decimal Price,
+        string CityName,
+        string CategoryName,
+        string Contacts,
+        string AuthorEmail,
+        bool AuthorIsTrusted,
+        int AuthorApprovedAdsCount,
+        DateTimeOffset SubmittedAt,
+        List<PhotoPayload> Photos);
+
+    private sealed record PhotoPayload(
+        Guid Id,
+        string Url,
+        string ThumbnailUrl,
+        string ContentType,
+        long ByteSize,
+        int Width,
+        int Height,
+        int SortOrder);
 
     private sealed record DecisionPayload(Guid AdId, string Status, bool TrustGranted);
 
-    private sealed record ComplaintPayload(Guid Id, Guid AdId, string AdTitle, string AuthorEmail, string Reason, DateTimeOffset CreatedAt);
+    private sealed record ComplaintPayload(
+        Guid Id,
+        Guid AdId,
+        string AdTitle,
+        string AdDescription,
+        decimal AdPrice,
+        string AdCityName,
+        string AdCategoryName,
+        string AdContacts,
+        string AdStatus,
+        string AdAuthorEmail,
+        List<PhotoPayload> AdPhotos,
+        string AuthorEmail,
+        string Reason,
+        int OpenComplaintsCount,
+        DateTimeOffset CreatedAt);
 }
