@@ -184,9 +184,17 @@ public class User : Entity
 
     /// <summary>Подтверждает адрес электронной почты.</summary>
     /// <param name="now">Момент подтверждения.</param>
-    public void ConfirmEmail(DateTimeOffset now)
+    public void ConfirmEmail(DateTimeOffset now) => SetEmailConfirmed(true, now);
+
+    /// <summary>
+    /// Устанавливает признак подтверждения адреса электронной почты. Используется
+    /// администратором, который может как подтвердить, так и снять подтверждение.
+    /// </summary>
+    /// <param name="isConfirmed">Новое состояние подтверждения.</param>
+    /// <param name="now">Момент изменения.</param>
+    public void SetEmailConfirmed(bool isConfirmed, DateTimeOffset now)
     {
-        IsEmailConfirmed = true;
+        IsEmailConfirmed = isConfirmed;
         MarkUpdated(now);
     }
 

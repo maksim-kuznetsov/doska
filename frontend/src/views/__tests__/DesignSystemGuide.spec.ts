@@ -23,6 +23,7 @@ describe('Страница-гайд дизайн-системы', () => {
     expect(text).toContain('#00aaff')
     expect(wrapper.find('[data-test="form-errors"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="queue-item"]').exists()).toBe(true)
+    expect(wrapper.find('#guide-checkbox').exists()).toBe(true)
     expect(text).toContain('Модальный диалог')
   })
 })

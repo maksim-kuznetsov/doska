@@ -1,5 +1,6 @@
 using Doska.Application.Abstractions;
 using Doska.Application.Common;
+using Doska.Domain.Entities;
 using Doska.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,7 +13,9 @@ public sealed record AdminUserView(
     string Role,
     bool IsTrusted,
     bool IsBlocked,
-    bool IsEmailConfirmed);
+    bool IsEmailConfirmed,
+    string? DisplayName,
+    string? Contacts);
 
 /// <summary>Административное управление учётными записями.</summary>
 public sealed class UserService(IAppDbContext db, TimeProvider clock)
@@ -28,13 +31,33 @@ public sealed class UserService(IAppDbContext db, TimeProvider clock)
                 user.Role.ToString(),
                 user.IsTrusted,
                 user.BlockedAt != null,
-                user.IsEmailConfirmed))
+                user.IsEmailConfirmed,
+                user.DisplayName,
+                user.Contacts))
             .ToListAsync(cancellationToken);
 
-    /// <summary>Меняет роль пользователя.</summary>
-    public async Task<AdminUserView> ChangeRoleAsync(
+    /// <summary>Возвращает сведения о пользователе для администратора.</summary>
+    public async Task<AdminUserView> GetByIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await LoadAsync(userId, cancellationToken);
+        return From(user);
+    }
+
+    /// <summary>
+    /// Сохраняет полный набор изменяемых свойств пользователя. Применяются только
+    /// фактически изменившиеся свойства, чтобы ручное сохранение без правок не
+    /// двигало отметку изменения и не сбрасывало счётчик доверия.
+    /// </summary>
+    public async Task<AdminUserView> UpdateAsync(
         Guid userId,
         string role,
+        bool isTrusted,
+        bool isBlocked,
+        bool isEmailConfirmed,
+        string? displayName,
+        string? contacts,
         CancellationToken cancellationToken = default)
     {
         if (!Enum.TryParse<UserRole>(role, ignoreCase: true, out var parsed) || !Enum.IsDefined(parsed))
@@ -42,18 +65,72 @@ public sealed class UserService(IAppDbContext db, TimeProvider clock)
             throw new ServiceException(ServiceErrorKind.Validation, "Неизвестная роль пользователя.");
         }
 
-        var user = await db.Users.FirstOrDefaultAsync(candidate => candidate.Id == userId, cancellationToken)
+        var user = await LoadAsync(userId, cancellationToken);
+        var now = clock.GetUtcNow();
+
+        if (user.Role != parsed)
+        {
+            user.ChangeRole(parsed, now);
+        }
+
+        if (user.IsTrusted != isTrusted)
+        {
+            if (isTrusted)
+            {
+                user.GrantTrust(now);
+            }
+            else
+            {
+                user.RevokeTrust(now);
+            }
+        }
+
+        if (user.IsBlocked != isBlocked)
+        {
+            if (isBlocked)
+            {
+                user.Block(now);
+            }
+            else
+            {
+                user.Unblock(now);
+            }
+        }
+
+        if (user.IsEmailConfirmed != isEmailConfirmed)
+        {
+            user.SetEmailConfirmed(isEmailConfirmed, now);
+        }
+
+        var normalizedDisplayName = Normalize(displayName);
+        var normalizedContacts = Normalize(contacts);
+
+        if (user.DisplayName != normalizedDisplayName || user.Contacts != normalizedContacts)
+        {
+            user.UpdateProfile(displayName, contacts, now);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return From(user);
+    }
+
+    private async Task<User> LoadAsync(Guid userId, CancellationToken cancellationToken)
+        => await db.Users.FirstOrDefaultAsync(user => user.Id == userId, cancellationToken)
             ?? throw new ServiceException(ServiceErrorKind.NotFound, "Пользователь не найден.");
 
-        user.ChangeRole(parsed, clock.GetUtcNow());
-        await db.SaveChangesAsync(cancellationToken);
+    private static AdminUserView From(User user) => new(
+        user.Id,
+        user.Email,
+        user.Role.ToString(),
+        user.IsTrusted,
+        user.IsBlocked,
+        user.IsEmailConfirmed,
+        user.DisplayName,
+        user.Contacts);
 
-        return new AdminUserView(
-            user.Id,
-            user.Email,
-            user.Role.ToString(),
-            user.IsTrusted,
-            user.IsBlocked,
-            user.IsEmailConfirmed);
+    private static string? Normalize(string? value)
+    {
+        var trimmed = value?.Trim();
+        return string.IsNullOrEmpty(trimmed) ? null : trimmed;
     }
 }

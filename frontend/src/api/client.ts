@@ -170,13 +170,26 @@ export interface CityAdminView {
   isActive: boolean
 }
 
+export type UserRole = 'User' | 'Moderator' | 'Admin'
+
 export interface AdminUserView {
   id: string
   email: string
-  role: 'User' | 'Moderator' | 'Admin'
+  role: UserRole
   isTrusted: boolean
   isBlocked: boolean
   isEmailConfirmed: boolean
+  displayName: string | null
+  contacts: string | null
+}
+
+export interface AdminUserUpdatePayload {
+  role: string
+  isTrusted: boolean
+  isBlocked: boolean
+  isEmailConfirmed: boolean
+  displayName: string | null
+  contacts: string | null
 }
 
 export interface OutboxMessageView {
@@ -379,8 +392,9 @@ export const api = {
   },
   adminUsers: {
     list: () => request<AdminUserView[]>('/admin/users'),
-    setRole: (id: string, role: string) =>
-      request<AdminUserView>(`/admin/users/${id}/role`, { method: 'PUT', body: { role } }),
+    get: (id: string) => request<AdminUserView>(`/admin/users/${id}`),
+    update: (id: string, payload: AdminUserUpdatePayload) =>
+      request<AdminUserView>(`/admin/users/${id}`, { method: 'PUT', body: payload }),
   },
   adminCategories: {
     tree: () => request<CategorySectionView[]>('/admin/categories'),

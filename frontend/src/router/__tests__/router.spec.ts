@@ -15,6 +15,14 @@ describe('Маршруты объявлений и заглушка', () => {
     expect(router.resolve('/ads/mine').name).toBe('ads-mine')
   })
 
+  it('открывает редактирование пользователя по адресу', () => {
+    const resolved = router.resolve('/admin/users/user-42')
+
+    expect(resolved.name).toBe('admin-user-edit')
+    expect(resolved.params.id).toBe('user-42')
+    expect(resolved.meta.requiresAdmin).toBe(true)
+  })
+
   it('показывает заглушку на неизвестном адресе внутри общего макета', () => {
     const resolved = router.resolve('/нет-такой-страницы')
 

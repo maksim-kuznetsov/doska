@@ -9,6 +9,7 @@ import AdFormView from '../views/AdFormView.vue'
 import AdminCategoriesView from '../views/AdminCategoriesView.vue'
 import AdminCitiesView from '../views/AdminCitiesView.vue'
 import AdminOutboxView from '../views/AdminOutboxView.vue'
+import AdminUserEditView from '../views/AdminUserEditView.vue'
 import AdminUsersView from '../views/AdminUsersView.vue'
 import ComplaintsQueueView from '../views/ComplaintsQueueView.vue'
 import ConfirmEmailView from '../views/ConfirmEmailView.vue'
@@ -133,6 +134,12 @@ const routes: RouteRecordRaw[] = [
         path: 'admin/users',
         name: 'admin-users',
         component: AdminUsersView,
+        meta: { requiresAdmin: true },
+      },
+      {
+        path: 'admin/users/:id',
+        name: 'admin-user-edit',
+        component: AdminUserEditView,
         meta: { requiresAdmin: true },
       },
       {

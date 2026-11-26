@@ -15,6 +15,7 @@ import AppMessage from '../components/AppMessage.vue'
 import Breadcrumbs from '../components/Breadcrumbs.vue'
 import CategoryMenu from '../components/CategoryMenu.vue'
 import CategoryStrip from '../components/CategoryStrip.vue'
+import CheckboxField from '../components/CheckboxField.vue'
 import CitySelect from '../components/CitySelect.vue'
 import ComplaintCard from '../components/ComplaintCard.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -159,6 +160,7 @@ const complaint: ComplaintQueueItem = {
 }
 
 const guideFields = ref({ title: 'Название объявления', description: 'Описание', category: '', city: '', min: '1000', max: '50000' })
+const guideCheckbox = ref(true)
 const guidePhotos = ref<File[]>([])
 const guideSort = ref<'newest' | 'price_asc' | 'price_desc'>('newest')
 const guidePassword = ref('secret123')
@@ -254,6 +256,13 @@ const guideErrors = [
         </FormGridItem>
         <FormGridItem wide>
           <SubsectionSelect v-model="guideFields.category" :sections="sections" input-id="guide-category" />
+        </FormGridItem>
+        <FormGridItem wide>
+          <CheckboxField
+            v-model="guideCheckbox"
+            label="Показывать объявление на главной"
+            input-id="guide-checkbox"
+          />
         </FormGridItem>
       </FormGrid>
     </div>

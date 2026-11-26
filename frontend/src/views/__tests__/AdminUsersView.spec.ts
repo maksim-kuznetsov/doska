@@ -3,17 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createApiClientMock } from '../../__tests__/helpers/apiClientMock'
 
-const { list, setRole } = vi.hoisted(() => ({ list: vi.fn(), setRole: vi.fn() }))
+const { list } = vi.hoisted(() => ({ list: vi.fn() }))
 
 vi.mock('../../api/client', () =>
   createApiClientMock({
     adminUsers: {
       list: () => list(),
-      setRole: (id: string, role: string) => setRole(id, role),
-    },
-    users: {
-      block: vi.fn(),
-      unblock: vi.fn(),
     },
   }),
 )
@@ -28,11 +23,9 @@ function mountView() {
 describe('AdminUsersView', () => {
   beforeEach(() => {
     list.mockReset()
-    setRole.mockReset()
-    setRole.mockResolvedValue(undefined)
   })
 
-  it('показывает пользователей, роли и статусы', async () => {
+  it('показывает пользователей со свойствами и ссылкой на редактирование', async () => {
     list.mockResolvedValue([
       {
         id: 'user-1',
@@ -41,6 +34,8 @@ describe('AdminUsersView', () => {
         isTrusted: false,
         isBlocked: false,
         isEmailConfirmed: true,
+        displayName: 'Иван',
+        contacts: '+7 999 000-00-00',
       },
       {
         id: 'user-2',
@@ -49,22 +44,28 @@ describe('AdminUsersView', () => {
         isTrusted: true,
         isBlocked: true,
         isEmailConfirmed: false,
+        displayName: null,
+        contacts: null,
       },
     ])
 
     const wrapper = mountView()
     await flushPromises()
 
-    expect(wrapper.findAll('[data-test="admin-user"]')).toHaveLength(2)
+    const cards = wrapper.findAll('[data-test="admin-user"]')
+    expect(cards).toHaveLength(2)
     expect(wrapper.text()).toContain('user@example.com')
     expect(wrapper.text()).toContain('blocked@example.com')
-    expect(wrapper.text()).toContain('Разблокировать')
-    expect(wrapper.find('.breadcrumbs').text()).toContain('Главная')
-    expect(wrapper.find('.breadcrumbs').text()).not.toContain('Пользователи')
-    expect(wrapper.findAll('[data-test="admin-user"]')[0].findAll('.status-badge')).toHaveLength(1)
+    expect(wrapper.text()).toContain('Иван')
+    expect(wrapper.text()).toContain('Модератор')
+    expect(cards[0].findAll('.status-badge')).toHaveLength(1)
+
+    const links = wrapper.findAll('a')
+    expect(links.some((link) => link.attributes('href') === '/admin/users/user-1')).toBe(true)
+    expect(links.some((link) => link.attributes('href') === '/admin/users/user-2')).toBe(true)
   })
 
-  it('сохраняет изменённую роль', async () => {
+  it('не даёт редактировать свойства прямо в списке', async () => {
     list.mockResolvedValue([
       {
         id: 'user-1',
@@ -73,17 +74,15 @@ describe('AdminUsersView', () => {
         isTrusted: false,
         isBlocked: false,
         isEmailConfirmed: true,
+        displayName: null,
+        contacts: null,
       },
     ])
 
     const wrapper = mountView()
     await flushPromises()
 
-    await wrapper.find('select').setValue('Moderator')
-    const save = wrapper.findAll('button').find((button) => button.text() === 'Сохранить роль')
-    await save!.trigger('click')
-    await flushPromises()
-
-    expect(setRole).toHaveBeenCalledWith('user-1', 'Moderator')
+    expect(wrapper.find('select').exists()).toBe(false)
+    expect(wrapper.findAll('button')).toHaveLength(0)
   })
 })

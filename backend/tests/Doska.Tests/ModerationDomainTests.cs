@@ -136,4 +136,20 @@ public sealed class ModerationDomainTests
         user.Unblock(Now);
         Assert.False(user.IsBlocked);
     }
+
+    [Fact]
+    public void Email_confirmation_can_be_set_both_ways()
+    {
+        var user = CreateUser();
+        Assert.False(user.IsEmailConfirmed);
+
+        user.ConfirmEmail(Now);
+        Assert.True(user.IsEmailConfirmed);
+
+        user.SetEmailConfirmed(false, Now);
+        Assert.False(user.IsEmailConfirmed);
+
+        user.SetEmailConfirmed(true, Now);
+        Assert.True(user.IsEmailConfirmed);
+    }
 }

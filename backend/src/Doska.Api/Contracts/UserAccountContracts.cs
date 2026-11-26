@@ -2,8 +2,14 @@ using Doska.Application.Accounts;
 
 namespace Doska.Api.Contracts;
 
-/// <summary>Запрос смены роли пользователя.</summary>
-public sealed record ChangeRoleRequest(string Role);
+/// <summary>Запрос полной правки пользователя администратором.</summary>
+public sealed record UpdateAdminUserRequest(
+    string Role,
+    bool IsTrusted,
+    bool IsBlocked,
+    bool IsEmailConfirmed,
+    string? DisplayName,
+    string? Contacts);
 
 /// <summary>Запрос сохранения профиля текущего пользователя.</summary>
 public sealed record UpdateProfileRequest(string? DisplayName, string? Contacts);
@@ -18,9 +24,19 @@ public sealed record AdminUserResponse(
     string Role,
     bool IsTrusted,
     bool IsBlocked,
-    bool IsEmailConfirmed)
+    bool IsEmailConfirmed,
+    string? DisplayName,
+    string? Contacts)
 {
     /// <summary>Создаёт ответ из представления.</summary>
     public static AdminUserResponse From(AdminUserView user)
-        => new(user.Id, user.Email, user.Role, user.IsTrusted, user.IsBlocked, user.IsEmailConfirmed);
+        => new(
+            user.Id,
+            user.Email,
+            user.Role,
+            user.IsTrusted,
+            user.IsBlocked,
+            user.IsEmailConfirmed,
+            user.DisplayName,
+            user.Contacts);
 }

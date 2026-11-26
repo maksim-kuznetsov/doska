@@ -399,18 +399,26 @@ public sealed class UserAccountApiTests : IClassFixture<ApiFactory>, IAsyncLifet
         Assert.Equal("User", target.Role);
 
         var change = await admin.PutJsonAsync(
-            $"/api/admin/users/{target.Id}/role",
-            new { role = "Moderator" },
+            $"/api/admin/users/{target.Id}",
+            UpdateBody(target, "Moderator"),
             ct);
         Assert.Equal(HttpStatusCode.OK, change.StatusCode);
         var updated = await change.Content.ReadFromJsonAsync<AdminUserPayload>(ct);
         Assert.Equal("Moderator", updated!.Role);
 
         var invalid = await admin.PutJsonAsync(
-            $"/api/admin/users/{target.Id}/role",
-            new { role = "Wizard" },
+            $"/api/admin/users/{target.Id}",
+            UpdateBody(target, "Wizard"),
             ct);
         Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+
+        var missing = Guid.NewGuid();
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (await admin.GetAsync($"/api/admin/users/{missing}", ct)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (await admin.PutJsonAsync($"/api/admin/users/{missing}", UpdateBody(target, "User"), ct)).StatusCode);
 
         using var moderator = _factory.CreateClient();
         await LoginAsync(moderator, await CreateStaffAsync(UserRole.Moderator, ct), ct);
@@ -418,7 +426,69 @@ public sealed class UserAccountApiTests : IClassFixture<ApiFactory>, IAsyncLifet
         Assert.Equal(HttpStatusCode.Forbidden, (await moderator.GetAsync("/api/admin/users", ct)).StatusCode);
         Assert.Equal(
             HttpStatusCode.Forbidden,
-            (await moderator.PutJsonAsync($"/api/admin/users/{target.Id}/role", new { role = "Admin" }, ct)).StatusCode);
+            (await moderator.PutJsonAsync($"/api/admin/users/{target.Id}", UpdateBody(target, "Admin"), ct)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Admin_views_and_updates_user_properties()
+    {
+        await EnsureDatabaseAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        using var admin = _factory.CreateClient();
+        await LoginAsync(admin, await CreateStaffAsync(UserRole.Admin, ct), ct);
+
+        var email = await RegisterAsync(_factory.CreateClient(), ct);
+        var target = await FindUserAsync(admin, email, ct);
+
+        var details = await admin.GetFromJsonAsync<AdminUserPayload>($"/api/admin/users/{target.Id}", ct);
+        Assert.NotNull(details);
+        Assert.Equal(email, details!.Email);
+
+        var update = await admin.PutJsonAsync(
+            $"/api/admin/users/{target.Id}",
+            new
+            {
+                role = "Moderator",
+                isTrusted = true,
+                isBlocked = true,
+                isEmailConfirmed = true,
+                displayName = "Иван",
+                contacts = "+7 999 000-00-00",
+            },
+            ct);
+
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+        var updated = await update.Content.ReadFromJsonAsync<AdminUserPayload>(ct);
+        Assert.Equal("Moderator", updated!.Role);
+        Assert.True(updated.IsTrusted);
+        Assert.True(updated.IsBlocked);
+        Assert.True(updated.IsEmailConfirmed);
+        Assert.Equal("Иван", updated.DisplayName);
+        Assert.Equal("+7 999 000-00-00", updated.Contacts);
+
+        var reloaded = await admin.GetFromJsonAsync<AdminUserPayload>($"/api/admin/users/{target.Id}", ct);
+        Assert.Equal("Moderator", reloaded!.Role);
+        Assert.True(reloaded.IsTrusted);
+        Assert.True(reloaded.IsBlocked);
+        Assert.Equal("Иван", reloaded.DisplayName);
+        Assert.Equal("+7 999 000-00-00", reloaded.Contacts);
+
+        var reopened = await admin.PutJsonAsync(
+            $"/api/admin/users/{target.Id}",
+            new
+            {
+                role = "Moderator",
+                isTrusted = true,
+                isBlocked = false,
+                isEmailConfirmed = false,
+                displayName = "Иван",
+                contacts = "+7 999 000-00-00",
+            },
+            ct);
+        var refreshed = await reopened.Content.ReadFromJsonAsync<AdminUserPayload>(ct);
+        Assert.False(refreshed!.IsBlocked);
+        Assert.False(refreshed.IsEmailConfirmed);
     }
 
     [Fact]
@@ -440,8 +510,8 @@ public sealed class UserAccountApiTests : IClassFixture<ApiFactory>, IAsyncLifet
         var target = await FindUserAsync(admin, email, ct);
 
         var promote = await admin.PutJsonAsync(
-            $"/api/admin/users/{target.Id}/role",
-            new { role = "Admin" },
+            $"/api/admin/users/{target.Id}",
+            UpdateBody(target, "Admin"),
             ct);
         Assert.Equal(HttpStatusCode.OK, promote.StatusCode);
 
@@ -450,8 +520,8 @@ public sealed class UserAccountApiTests : IClassFixture<ApiFactory>, IAsyncLifet
             (await user.GetAsync("/api/admin/categories", ct)).StatusCode);
 
         var demote = await admin.PutJsonAsync(
-            $"/api/admin/users/{target.Id}/role",
-            new { role = "User" },
+            $"/api/admin/users/{target.Id}",
+            UpdateBody(target, "User"),
             ct);
         Assert.Equal(HttpStatusCode.OK, demote.StatusCode);
 
@@ -584,7 +654,19 @@ public sealed class UserAccountApiTests : IClassFixture<ApiFactory>, IAsyncLifet
         string Role,
         bool IsTrusted,
         bool IsBlocked,
-        bool IsEmailConfirmed);
+        bool IsEmailConfirmed,
+        string? DisplayName,
+        string? Contacts);
+
+    private static object UpdateBody(AdminUserPayload user, string role) => new
+    {
+        role,
+        isTrusted = user.IsTrusted,
+        isBlocked = user.IsBlocked,
+        isEmailConfirmed = user.IsEmailConfirmed,
+        displayName = user.DisplayName,
+        contacts = user.Contacts,
+    };
 }
 
 /// <summary>Фабрика с низким лимитом повторных писем подтверждения для проверки ответа 429.</summary>

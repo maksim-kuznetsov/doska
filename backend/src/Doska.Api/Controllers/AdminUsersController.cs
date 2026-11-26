@@ -20,11 +20,24 @@ public sealed class AdminUsersController(UserService userService) : ControllerBa
         return Ok(users.Select(AdminUserResponse.From).ToList());
     }
 
-    /// <summary>Меняет роль пользователя.</summary>
-    [HttpPut("{id:guid}/role")]
-    public async Task<ActionResult<AdminUserResponse>> ChangeRole(
+    /// <summary>Возвращает свойства выбранного пользователя.</summary>
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<AdminUserResponse>> Get(Guid id, CancellationToken cancellationToken)
+        => Ok(AdminUserResponse.From(await userService.GetByIdAsync(id, cancellationToken)));
+
+    /// <summary>Сохраняет полный набор изменяемых свойств пользователя.</summary>
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<AdminUserResponse>> Update(
         Guid id,
-        [FromBody] ChangeRoleRequest request,
+        [FromBody] UpdateAdminUserRequest request,
         CancellationToken cancellationToken)
-        => Ok(AdminUserResponse.From(await userService.ChangeRoleAsync(id, request.Role, cancellationToken)));
+        => Ok(AdminUserResponse.From(await userService.UpdateAsync(
+            id,
+            request.Role,
+            request.IsTrusted,
+            request.IsBlocked,
+            request.IsEmailConfirmed,
+            request.DisplayName,
+            request.Contacts,
+            cancellationToken)));
 }
