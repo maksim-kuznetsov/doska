@@ -46,7 +46,7 @@
 Google-вход необязателен: без настроек приложение работает как раньше, а кнопка входа скрыта.
 
 1. В Google Cloud Console создайте OAuth-клиент типа **Web application**.
-2. В поле **Authorized redirect URIs** добавьте `http://localhost:5000/api/auth/google/callback`.
+2. В поле **Authorized redirect URIs** добавьте `http://localhost:5173/api/auth/google/callback`.
 3. Запустите API с кредами в переменных окружения:
 
    ```
@@ -55,7 +55,7 @@ Google-вход необязателен: без настроек приложе
    dotnet run --project backend/src/Doska.Api
    ```
 
-Адрес обратного вызова указывает на API (`:5000`), потому что Vite-прокси с `changeOrigin: true` формирует `redirect_uri` от имени API. После обратного вызова API сам открывает браузер на `http://localhost:5173` — в профиль или на страницу, с которой начался вход.
+Redirect URI строится из `App:PublicBaseUrl` (`http://localhost:5173` в Development), поэтому обратный вызов проходит через Vite-прокси и открывается на адресе интерфейса. В production для этого используется публичный адрес сайта с портом, если он нестандартный.
 
 ## Справочники и сиды
 

@@ -305,6 +305,10 @@ if (!app.Environment.IsDevelopment())
     app.UseForwardedHeaders();
 }
 
+// Google OAuth строит redirect_uri из Host запроса. Обратный прокси может
+// потерять нестандартный порт, поэтому для этих путей берём публичный адрес сайта.
+app.UseGooglePublicHost();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

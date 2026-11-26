@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.RegularExpressions;
 using Doska.Tests.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -102,10 +103,15 @@ public sealed class GoogleAuthApiTests : IClassFixture<GoogleConfiguredApiFactor
         var response = await client.GetAsync("/api/auth/google/start?redirect=/ads", ct);
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.StartsWith(
-            "https://accounts.google.com/",
-            response.Headers.Location!.ToString(),
-            StringComparison.Ordinal);
+
+        var location = response.Headers.Location!.ToString();
+        Assert.StartsWith("https://accounts.google.com/", location, StringComparison.Ordinal);
+
+        var redirectUri = Regex.Match(location, "redirect_uri=([^&]+)");
+        Assert.True(redirectUri.Success);
+        Assert.Equal(
+            "https://doska.example.com:8443/api/auth/google/callback",
+            Uri.UnescapeDataString(redirectUri.Groups[1].Value));
     }
 
     [Fact]
@@ -167,6 +173,7 @@ public class GoogleConfiguredApiFactory : ApiFactory
         base.ConfigureWebHost(builder);
         builder.UseSetting("Google:ClientId", "test-client");
         builder.UseSetting("Google:ClientSecret", "test-secret");
+        builder.UseSetting("App:PublicBaseUrl", "https://doska.example.com:8443");
     }
 }
 
