@@ -83,6 +83,8 @@ public sealed class ModelConfigurationTests : IDisposable
 
     [Theory]
     [InlineData(typeof(User), nameof(User.Email), "character varying(320)")]
+    [InlineData(typeof(User), nameof(User.GoogleSubject), "character varying(255)")]
+    [InlineData(typeof(User), nameof(User.HasPassword), "boolean")]
     [InlineData(typeof(User), nameof(User.Role), "character varying(20)")]
     [InlineData(typeof(UserToken), nameof(UserToken.TokenHash), "character varying(64)")]
     [InlineData(typeof(Ad), nameof(Ad.Title), "character varying(200)")]
@@ -121,6 +123,7 @@ public sealed class ModelConfigurationTests : IDisposable
 
     [Theory]
     [InlineData(typeof(User), "Email", true)]
+    [InlineData(typeof(User), "GoogleSubject", true)]
     [InlineData(typeof(City), "Name", true)]
     [InlineData(typeof(Category), "Name", true)]
     [InlineData(typeof(UserToken), "TokenHash", true)]
@@ -146,6 +149,16 @@ public sealed class ModelConfigurationTests : IDisposable
 
         Assert.NotNull(index);
         Assert.Equal(isUnique, index!.IsUnique);
+    }
+
+    [Fact]
+    public void HasPassword_has_true_default_for_existing_users()
+    {
+        var property = FindEntityType(typeof(User)).FindProperty(nameof(User.HasPassword));
+
+        Assert.NotNull(property);
+        Assert.False(property!.IsNullable);
+        Assert.Equal(true, property.GetDefaultValue());
     }
 
     [Theory]

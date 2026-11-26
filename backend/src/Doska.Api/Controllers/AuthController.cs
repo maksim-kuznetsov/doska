@@ -4,16 +4,20 @@ using Doska.Api.Infrastructure;
 using Doska.Application.Auth;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 
 namespace Doska.Api.Controllers;
 
 /// <summary>Регистрация, вход, выход и подтверждение email.</summary>
 [ApiController]
 [Route("api/auth")]
-public sealed class AuthController(AuthService authService) : ControllerBase
+public sealed class AuthController(
+    AuthService authService,
+    IOptions<GoogleSignInOptions> googleOptions) : ControllerBase
 {
     /// <summary>Выдаёт antiforgery-токен для изменяющих запросов.</summary>
     [HttpGet("csrf")]
@@ -35,6 +39,44 @@ public sealed class AuthController(AuthService authService) : ControllerBase
         var user = await authService.RegisterAsync(request.Email, request.Password, cancellationToken);
         await SignInAsync(user);
         return Ok(UserResponse.From(user));
+    }
+
+    /// <summary>Сообщает, какие внешние провайдеры входа настроены.</summary>
+    [HttpGet("providers")]
+    [AllowAnonymous]
+    public ActionResult<AuthProvidersResponse> Providers()
+        => Ok(new AuthProvidersResponse(googleOptions.Value.IsConfigured));
+
+    /// <summary>Начинает вход через Google.</summary>
+    [HttpGet("google/start")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Sensitive)]
+    public IActionResult GoogleStart([FromQuery] string? redirect)
+    {
+        if (!googleOptions.Value.IsConfigured)
+        {
+            return GoogleUnavailable();
+        }
+
+        return Challenge(
+            GoogleAuthentication.LoginProperties(redirect),
+            GoogleDefaults.AuthenticationScheme);
+    }
+
+    /// <summary>Начинает привязку Google к текущему аккаунту.</summary>
+    [HttpGet("google/link")]
+    [Authorize]
+    [EnableRateLimiting(RateLimitPolicies.Sensitive)]
+    public IActionResult GoogleLink()
+    {
+        if (!googleOptions.Value.IsConfigured)
+        {
+            return GoogleUnavailable();
+        }
+
+        return Challenge(
+            GoogleAuthentication.LinkProperties(User.GetRequiredUserId()),
+            GoogleDefaults.AuthenticationScheme);
     }
 
     /// <summary>Выполняет вход по email и паролю.</summary>
@@ -122,4 +164,13 @@ public sealed class AuthController(AuthService authService) : ControllerBase
             CookieAuthenticationDefaults.AuthenticationScheme,
             ClaimsPrincipalExtensions.CreateSessionPrincipal(user));
     }
+
+    private ObjectResult GoogleUnavailable()
+        => StatusCode(
+            StatusCodes.Status503ServiceUnavailable,
+            new ProblemDetails
+            {
+                Status = StatusCodes.Status503ServiceUnavailable,
+                Title = "Вход через Google не настроен.",
+            });
 }

@@ -18,7 +18,9 @@ public sealed class ClaimsPrincipalExtensionsTests
             IsTrusted: true,
             IsEmailConfirmed: true,
             DisplayName: "Модератор",
-            Contacts: null);
+            Contacts: null,
+            HasPassword: true,
+            IsGoogleLinked: false);
 
         var principal = ClaimsPrincipalExtensions.CreateSessionPrincipal(user);
 

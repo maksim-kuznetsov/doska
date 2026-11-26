@@ -38,6 +38,8 @@ function userWith(displayName: string | null, contacts: string | null): CurrentU
     isEmailConfirmed: true,
     displayName,
     contacts,
+    hasPassword: true,
+    isGoogleLinked: false,
   }
 }
 

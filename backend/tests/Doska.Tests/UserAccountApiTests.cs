@@ -108,6 +108,32 @@ public sealed class UserAccountApiTests : IClassFixture<ApiFactory>, IAsyncLifet
     }
 
     [Fact]
+    public async Task Password_login_is_rejected_for_google_only_account()
+    {
+        await EnsureDatabaseAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var email = $"accounts-google-{Guid.NewGuid():N}@example.com";
+
+        await TestDatabase.WithContextAsync(_factory, async db =>
+        {
+            db.Users.Add(User.CreateWithGoogle(
+                email,
+                $"google-subject-{Guid.NewGuid():N}",
+                "placeholder-hash",
+                DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync(ct);
+        });
+
+        using var client = _factory.CreateClient();
+        var response = await client.PostJsonAsync(
+            "/api/auth/login",
+            new { email, password = Password },
+            ct);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Legacy_base64_confirmation_token_still_confirms_account()
     {
         await EnsureDatabaseAsync();

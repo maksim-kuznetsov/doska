@@ -95,6 +95,12 @@ builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
 builder.Services.Configure<PublicUrlOptions>(builder.Configuration.GetSection(PublicUrlOptions.SectionName));
 builder.Services.Configure<MediaOptions>(builder.Configuration.GetSection(MediaOptions.SectionName));
+builder.Services.Configure<GoogleSignInOptions>(
+    builder.Configuration.GetSection(GoogleSignInOptions.SectionName));
+
+var googleSettings = builder.Configuration
+    .GetSection(GoogleSignInOptions.SectionName)
+    .Get<GoogleSignInOptions>() ?? new GoogleSignInOptions();
 builder.Services.AddSingleton<IPublicUrlProvider, ConfiguredPublicUrlProvider>();
 builder.Services.AddScoped<IAdPhotoStorage, LocalAdPhotoStorage>();
 builder.Services.AddScoped<IMediaMaintenance, MediaMaintenanceService>();
@@ -136,6 +142,7 @@ switch (emailMode.Trim().ToLowerInvariant())
 builder.Services.AddScoped<IEmailOutbox, FileEmailOutbox>();
 
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<GoogleAuthService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<AdService>();
@@ -147,7 +154,7 @@ builder.Services.AddScoped<ModerationService>();
 builder.Services.AddScoped<ComplaintService>();
 builder.Services.AddScoped<TrustService>();
 
-builder.Services
+var authentication = builder.Services
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
@@ -194,6 +201,45 @@ builder.Services
             },
         };
     });
+
+// Google-провайдер подключается только при наличии кредов. Без них приложение
+// работает как раньше, а публичный статус провайдера сообщает, что вход выключен.
+if (googleSettings.IsConfigured)
+{
+    authentication.AddCookie(GoogleAuthentication.ExternalScheme, options =>
+    {
+        options.Cookie.Name = "doska.google";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(10);
+        options.SlidingExpiration = false;
+    });
+
+    authentication.AddGoogle(options =>
+    {
+        options.ClientId = googleSettings.ClientId!.Trim();
+        options.ClientSecret = googleSettings.ClientSecret!.Trim();
+        options.CallbackPath = "/api/auth/google/callback";
+        options.SignInScheme = GoogleAuthentication.ExternalScheme;
+        options.SaveTokens = false;
+
+        options.Scope.Clear();
+        options.Scope.Add("openid");
+        options.Scope.Add("email");
+        options.Scope.Add("profile");
+
+        options.CorrelationCookie.Name = "doska.google.correlation";
+        options.CorrelationCookie.HttpOnly = true;
+        options.CorrelationCookie.SameSite = SameSiteMode.Lax;
+        options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+
+        options.Events.OnCreatingTicket = GoogleAuthentication.OnCreatingTicket;
+        options.Events.OnTicketReceived = GoogleAuthentication.OnTicketReceived;
+        options.Events.OnRemoteFailure = GoogleAuthentication.OnRemoteFailure;
+        options.Events.OnAccessDenied = GoogleAuthentication.OnAccessDenied;
+    });
+}
 
 builder.Services.AddAuthorization(options =>
 {

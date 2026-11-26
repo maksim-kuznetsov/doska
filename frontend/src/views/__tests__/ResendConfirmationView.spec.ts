@@ -45,6 +45,8 @@ async function mountView(userEmail?: string) {
       isEmailConfirmed: false,
       displayName: null,
       contacts: null,
+      hasPassword: true,
+      isGoogleLinked: false,
     }
   }
 

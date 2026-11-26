@@ -16,7 +16,9 @@ public sealed record AuthenticatedUser(
     bool IsTrusted,
     bool IsEmailConfirmed,
     string? DisplayName,
-    string? Contacts)
+    string? Contacts,
+    bool HasPassword,
+    bool IsGoogleLinked)
 {
     /// <summary>Создаёт сведения о пользователе из сущности.</summary>
     public static AuthenticatedUser From(User user)
@@ -27,7 +29,9 @@ public sealed record AuthenticatedUser(
             user.IsTrusted,
             user.IsEmailConfirmed,
             user.DisplayName,
-            user.Contacts);
+            user.Contacts,
+            user.HasPassword,
+            user.GoogleSubject is not null);
 }
 
 /// <summary>Регистрация, вход и подтверждение email.</summary>
@@ -97,7 +101,7 @@ public sealed class AuthService(
             candidate => candidate.Email.ToLower() == normalizedEmail.ToLower(),
             cancellationToken);
 
-        if (user is null || !passwordHasher.Verify(password, user.PasswordHash))
+        if (user is null || !user.HasPassword || !passwordHasher.Verify(password, user.PasswordHash))
         {
             throw new ServiceException(ServiceErrorKind.Unauthorized, "Неверный email или пароль.");
         }

@@ -7,6 +7,7 @@ import { api, type CurrentUser } from '../api/client'
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<CurrentUser | null>(null)
   const loaded = ref(false)
+  const googleEnabled = ref(false)
 
   const isAuthenticated = computed(() => user.value !== null)
   const canModerate = computed(
@@ -15,13 +16,15 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdmin = computed(() => user.value?.role === 'Admin')
 
   async function load(): Promise<void> {
-    try {
-      user.value = await api.auth.me()
-    } catch {
-      user.value = null
-    } finally {
-      loaded.value = true
-    }
+    const [userResult, providersResult] = await Promise.allSettled([
+      api.auth.me(),
+      api.auth.providers(),
+    ])
+
+    user.value = userResult.status === 'fulfilled' ? userResult.value : null
+    googleEnabled.value =
+      providersResult.status === 'fulfilled' ? providersResult.value.google : false
+    loaded.value = true
   }
 
   async function login(email: string, password: string): Promise<void> {
@@ -46,6 +49,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     user,
     loaded,
+    googleEnabled,
     isAuthenticated,
     canModerate,
     isAdmin,
