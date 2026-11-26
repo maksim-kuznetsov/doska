@@ -11,6 +11,12 @@ export interface CurrentUser {
   isEmailConfirmed: boolean
   displayName: string | null
   contacts: string | null
+  hasPassword: boolean
+  isGoogleLinked: boolean
+}
+
+export interface AuthProviders {
+  google: boolean
 }
 
 export interface AdPhotoSummary {
@@ -308,6 +314,7 @@ async function requestForm<T>(path: string, formData: FormData): Promise<T> {
 export const api = {
   auth: {
     me: () => request<CurrentUser>('/auth/me'),
+    providers: () => request<AuthProviders>('/auth/providers'),
     login: (email: string, password: string) =>
       request<CurrentUser>('/auth/login', { method: 'POST', body: { email, password } }),
     register: (email: string, password: string) =>

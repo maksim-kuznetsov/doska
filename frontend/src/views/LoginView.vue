@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { messageOf } from '../api/errors'
+import { googleErrorMessage, googleStartUrl } from '../api/googleAuth'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
 import TextField from '../components/TextField.vue'
@@ -16,6 +17,14 @@ const email = ref('')
 const password = ref('')
 const error = ref('')
 const submitting = ref(false)
+
+const redirect = computed(() =>
+  typeof route.query.redirect === 'string' ? route.query.redirect : null,
+)
+const googleHref = computed(() => googleStartUrl(redirect.value))
+const googleError = computed(() =>
+  route.query.google === 'error' ? googleErrorMessage(route.query.reason) : '',
+)
 
 async function submit(): Promise<void> {
   error.value = ''
@@ -62,6 +71,13 @@ async function submit(): Promise<void> {
         {{ submitting ? 'Входим…' : 'Войти' }}
       </AppButton>
     </form>
+
+    <AppMessage v-if="googleError" variant="error">{{ googleError }}</AppMessage>
+
+    <template v-if="auth.googleEnabled">
+      <p class="text-muted">Или войдите без пароля:</p>
+      <a class="btn btn--secondary btn--block" :href="googleHref">Войти через Google</a>
+    </template>
 
     <p class="text-muted">
       <RouterLink class="link" to="/forgot-password">Забыли пароль?</RouterLink>

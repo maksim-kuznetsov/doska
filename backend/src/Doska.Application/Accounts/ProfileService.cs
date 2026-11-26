@@ -50,14 +50,15 @@ public sealed class ProfileService(
     /// <summary>Меняет пароль пользователя, проверяя текущий пароль.</summary>
     public async Task ChangePasswordAsync(
         Guid userId,
-        string currentPassword,
+        string? currentPassword,
         string newPassword,
         CancellationToken cancellationToken = default)
     {
         var user = await db.Users.FirstOrDefaultAsync(candidate => candidate.Id == userId, cancellationToken)
             ?? throw new ServiceException(ServiceErrorKind.Unauthorized, "Требуется вход.");
 
-        if (!passwordHasher.Verify(currentPassword, user.PasswordHash))
+        if (user.HasPassword
+            && !passwordHasher.Verify(currentPassword ?? string.Empty, user.PasswordHash))
         {
             throw new ServiceException(ServiceErrorKind.Unauthorized, "Неверный текущий пароль.");
         }

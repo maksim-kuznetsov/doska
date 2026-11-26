@@ -37,6 +37,17 @@ internal static class TestData
         return user;
     }
 
+    /// <summary>Создаёт подтверждённый аккаунт, привязанный к Google, без известного пароля.</summary>
+    public static User CreateGoogleUser(
+        string? email = null,
+        string? googleSubject = null,
+        DateTimeOffset? now = null)
+        => User.CreateWithGoogle(
+            email ?? $"google-{Guid.NewGuid():N}@example.com",
+            googleSubject ?? $"google-subject-{Guid.NewGuid():N}",
+            "test-hash",
+            now ?? DateTimeOffset.UtcNow);
+
     /// <summary>Создаёт город.</summary>
     public static City CreateCity(string? name = null, DateTimeOffset? now = null)
         => new(name ?? $"Город {Guid.NewGuid():N}", now ?? DateTimeOffset.UtcNow);

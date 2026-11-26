@@ -41,6 +41,22 @@
 
    Адрес — http://localhost:5173; запросы к `/api` проксируются на http://localhost:5000.
 
+### Вход через Google локально
+
+Google-вход необязателен: без настроек приложение работает как раньше, а кнопка входа скрыта.
+
+1. В Google Cloud Console создайте OAuth-клиент типа **Web application**.
+2. В поле **Authorized redirect URIs** добавьте `http://localhost:5000/api/auth/google/callback`.
+3. Запустите API с кредами в переменных окружения:
+
+   ```
+   $env:Google__ClientId="<client id>"
+   $env:Google__ClientSecret="<client secret>"
+   dotnet run --project backend/src/Doska.Api
+   ```
+
+Адрес обратного вызова указывает на API (`:5000`), потому что Vite-прокси с `changeOrigin: true` формирует `redirect_uri` от имени API. После обратного вызова API сам открывает браузер на `http://localhost:5173` — в профиль или на страницу, с которой начался вход.
+
 ## Справочники и сиды
 
 - `init-data` — базовые справочники: три города и три раздела каталога. Используется при первичной инициализации production.

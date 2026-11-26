@@ -149,6 +149,9 @@ POSTGRES_PASSWORD=<длинный случайный пароль>
 DOMAIN=doska.example.com
 ACME_EMAIL=admin@example.com
 App__PublicBaseUrl=https://doska.example.com
+# Google-вход необязателен; значения добавляются после создания OAuth-клиента (шаг 8).
+# Google__ClientId=<client id>
+# Google__ClientSecret=<client secret>
 Email__Mode=File
 Email__OutboxPath=/srv/doska/outbox
 # SMTP-параметры — после подтверждения домена отправителя и переключения на Email__Mode=Smtp.
@@ -223,7 +226,32 @@ docker compose -f docker-compose.prod.yml up -d api
 
 Проверка: зарегистрируйте тестовый аккаунт, письмо должно прийти на указанный адрес, а ссылка подтверждения — открываться по адресу `https://doska.example.com/confirm-email?token=...`. Подробности и список бесплатных провайдеров — в разделе «Почта в production».
 
-### Шаг 8. Резервное копирование
+### Шаг 8. Вход через Google
+
+Google-вход необязателен: без кредов приложение работает как раньше, а кнопка входа скрыта.
+
+1. В Google Cloud Console откройте **APIs & Services → Credentials → Create credentials → OAuth client ID**.
+2. Тип приложения — **Web application**, в **Authorized redirect URIs** укажите:
+   `https://<домен>/api/auth/google/callback`.
+3. Добавьте в `.env` на сервере:
+
+   ```dotenv
+   Google__ClientId=<client id>
+   Google__ClientSecret='<client secret>'
+   ```
+
+   Секрет с символами `$`, `#` или кавычками заключите в одинарные кавычки. Значения хранятся только в `.env` и не попадают в репозиторий.
+4. Пересоздайте API:
+
+   ```bash
+   docker compose -f docker-compose.prod.yml up -d api
+   ```
+
+5. Проверьте: `curl -fsS https://doska.example.com/api/auth/providers` возвращает `{"google":true}`, на странице входа появилась кнопка Google, а в профиле доступна привязка.
+
+Для отключения провайдера удалите оба значения из `.env` и пересоздайте API.
+
+### Шаг 9. Резервное копирование
 
 Создайте каталог и первую копию:
 
@@ -248,12 +276,13 @@ crontab -e
 
 Копии нужно выносить за пределы сервера — подробности и пример в разделе «Резервное копирование».
 
-### Шаг 9. Финальные проверки
+### Шаг 10. Финальные проверки
 
 - Сайт открывается по HTTPS, HTTP перенаправляется.
 - В браузере устанавливается PWA (DevTools → Application → Manifest/Service Workers).
 - Регистрация проходит, письмо приходит, ссылка подтверждения открывается.
 - Вход администратора работает, видны категории и города.
+- При настроенном Google работают вход нового пользователя, автоматическая привязка существующего аккаунта и привязка из профиля.
 - Подача объявления с фотографией и одобрение модератором проходят.
 - `docker compose -f docker-compose.prod.yml ps` не показывает нездоровых сервисов.
 - `docker compose -f docker-compose.prod.yml logs --tail=100 api` не содержит ошибок.
@@ -346,7 +375,9 @@ docker compose -f docker-compose.prod.yml up -d --build
 | `POSTGRES_PASSWORD` | да | Пароль базы. Генерируйте случайным. |
 | `DOMAIN` | да | Домен для сертификата и сайта. |
 | `ACME_EMAIL` | да | Адрес для уведомлений Let's Encrypt. |
-| `App__PublicBaseUrl` | да | Публичный адрес сайта для ссылок в письмах. |
+| `App__PublicBaseUrl` | да | Публичный адрес сайта для ссылок в письмах и возврата после Google-входа. |
+| `Google__ClientId` | нет | Идентификатор OAuth-клиента Google; вместе с секретом включает Google-вход. |
+| `Google__ClientSecret` | нет | Секрет OAuth-клиента Google. Храните только в `.env`. |
 | `Email__Mode` | нет, по умолчанию `File` | Режим отправки: `File` (текущий, письма в `Email__OutboxPath`) или `Smtp` (после подтверждения домена). |
 | `Email__Host` | да, при режиме `Smtp` | SMTP-хост провайдера. |
 | `Email__Port` | нет, по умолчанию `587` | SMTP-порт. |

@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 import { api } from '../api/client'
 import { messageOf } from '../api/errors'
+import { googleErrorMessage, googleLinkUrl } from '../api/googleAuth'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
 import FormSection from '../components/FormSection.vue'
@@ -12,6 +14,24 @@ import TextField from '../components/TextField.vue'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
+const route = useRoute()
+const router = useRouter()
+
+const googleMessage = ref('')
+const googleError = ref('')
+const needsPassword = computed(() => auth.user?.hasPassword === false)
+
+onMounted(() => {
+  if (route.query.google === 'linked') {
+    googleMessage.value = 'Google привязан к аккаунту.'
+  } else if (route.query.google === 'error') {
+    googleError.value = googleErrorMessage(route.query.reason)
+  } else {
+    return
+  }
+
+  void router.replace({ name: 'profile' })
+})
 
 const profile = reactive({
   displayName: auth.user?.displayName ?? '',
@@ -27,7 +47,7 @@ const password = reactive({
   confirmation: '',
 })
 const passwordError = ref('')
-const passwordSaved = ref(false)
+const passwordSaved = ref('')
 const savingPassword = ref(false)
 
 /** Пустые значения уходят на сервер как `null`, чтобы очистить поле профиля. */
@@ -53,12 +73,18 @@ async function saveProfile(): Promise<void> {
 
 async function changePassword(): Promise<void> {
   passwordError.value = ''
-  passwordSaved.value = false
+  passwordSaved.value = ''
   savingPassword.value = true
+  const firstPassword = needsPassword.value
 
   try {
     await api.account.changePassword(password.current, password.next)
-    passwordSaved.value = true
+
+    if (firstPassword) {
+      await auth.load()
+    }
+
+    passwordSaved.value = firstPassword ? 'Пароль задан.' : 'Пароль изменён.'
     password.current = ''
     password.next = ''
     password.confirmation = ''
@@ -103,9 +129,28 @@ async function changePassword(): Promise<void> {
       </AppButton>
     </form>
 
+    <FormSection
+      v-if="auth.googleEnabled || auth.user?.isGoogleLinked"
+      title="Вход через Google"
+    >
+      <p v-if="auth.user?.isGoogleLinked" class="text-muted">
+        Google привязан к аккаунту: можно входить без пароля.
+      </p>
+      <template v-else>
+        <p class="text-muted">
+          Привяжите Google, чтобы входить в аккаунт без пароля.
+        </p>
+        <a class="btn btn--secondary" :href="googleLinkUrl()">Привязать Google</a>
+      </template>
+
+      <AppMessage v-if="googleMessage" variant="success">{{ googleMessage }}</AppMessage>
+      <AppMessage v-if="googleError" variant="error">{{ googleError }}</AppMessage>
+    </FormSection>
+
     <form class="stack" @submit.prevent="changePassword">
-      <FormSection title="Смена пароля">
+      <FormSection :title="needsPassword ? 'Задать пароль' : 'Смена пароля'">
         <TextField
+          v-if="!needsPassword"
           v-model="password.current"
           label="Текущий пароль"
           input-id="profile-current-password"
@@ -133,10 +178,16 @@ async function changePassword(): Promise<void> {
       </FormSection>
 
       <AppMessage v-if="passwordError" variant="error">{{ passwordError }}</AppMessage>
-      <AppMessage v-else-if="passwordSaved" variant="success">Пароль изменён.</AppMessage>
+      <AppMessage v-else-if="passwordSaved" variant="success">{{ passwordSaved }}</AppMessage>
 
       <AppButton variant="primary" type="submit" block :disabled="savingPassword">
-        {{ savingPassword ? 'Сохраняем…' : 'Сменить пароль' }}
+        {{
+          savingPassword
+            ? 'Сохраняем…'
+            : needsPassword
+              ? 'Задать пароль'
+              : 'Сменить пароль'
+        }}
       </AppButton>
     </form>
   </section>

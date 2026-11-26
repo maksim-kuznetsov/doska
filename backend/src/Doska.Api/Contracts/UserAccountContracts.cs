@@ -9,7 +9,7 @@ public sealed record ChangeRoleRequest(string Role);
 public sealed record UpdateProfileRequest(string? DisplayName, string? Contacts);
 
 /// <summary>Запрос смены пароля текущего пользователя.</summary>
-public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
+public sealed record ChangePasswordRequest(string? CurrentPassword, string NewPassword);
 
 /// <summary>Сведения о пользователе для администратора.</summary>
 public sealed record AdminUserResponse(
