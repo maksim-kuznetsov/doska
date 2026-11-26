@@ -7,6 +7,7 @@ import {
   googlePrivacyPolicyUrl,
   operatorName,
   privacyUpdatedAt,
+  publicSiteDisplayUrl,
   publicSiteUrl,
   termsUpdatedAt,
 } from '../details'
@@ -17,11 +18,14 @@ describe('Реквизиты правовых документов', () => {
   it('заполняет оператора, адрес сайта и контакт без заглушек', () => {
     expect(operatorName).toBe('Администрация сайта Doska')
     expect(publicSiteUrl).toBe('https://doska.xn--b1affljii0b4a.xn--p1ai:8443/')
+    expect(publicSiteDisplayUrl).toBe('https://doska.мкузнецов.рф:8443/')
+    expect(publicSiteDisplayUrl).not.toContain('xn--')
     expect(contactEmail).toBe('maksim.kuznetsov@live.ru')
 
     const values = [
       operatorName,
       publicSiteUrl,
+      publicSiteDisplayUrl,
       contactEmail,
       privacyUpdatedAt,
       termsUpdatedAt,

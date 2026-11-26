@@ -7,7 +7,11 @@
  */
 export const operatorName = 'Администрация сайта Doska'
 
+/** Публичный адрес сайта в ASCII (punycode) — используется в ссылках `href`. */
 export const publicSiteUrl = 'https://doska.xn--b1affljii0b4a.xn--p1ai:8443/'
+
+/** Кириллическое отображение публичного адреса для текста документов. */
+export const publicSiteDisplayUrl = 'https://doska.мкузнецов.рф:8443/'
 
 export const contactEmail = 'maksim.kuznetsov@live.ru'
 

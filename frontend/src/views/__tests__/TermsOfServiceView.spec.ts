@@ -25,6 +25,15 @@ describe('TermsOfServiceView', () => {
     expect(wrapper.get('.legal__updated').text()).toContain('26 ноября 2026')
   })
 
+  it('показывает кириллический адрес сайта, а ссылка ведёт на ASCII-домен', async () => {
+    const wrapper = await mountView()
+    const text = wrapper.text()
+
+    expect(text).toContain('https://doska.мкузнецов.рф:8443/')
+    expect(text).not.toContain('xn--')
+    expect(wrapper.get('a[href="https://doska.xn--b1affljii0b4a.xn--p1ai:8443/"]')).toBeTruthy()
+  })
+
   it('сообщает о принятии условий и ссылается на политику', async () => {
     const wrapper = await mountView()
     const text = wrapper.text()

@@ -15,7 +15,9 @@ describe('PrivacyPolicyView', () => {
     const text = wrapper.text()
 
     expect(text).toContain('Администрация сайта Doska')
-    expect(text).toContain('https://doska.xn--b1affljii0b4a.xn--p1ai:8443/')
+    expect(text).toContain('https://doska.мкузнецов.рф:8443/')
+    expect(text).not.toContain('xn--')
+    expect(wrapper.get('a[href="https://doska.xn--b1affljii0b4a.xn--p1ai:8443/"]')).toBeTruthy()
     expect(text).toContain('maksim.kuznetsov@live.ru')
     expect(wrapper.get('a[href="mailto:maksim.kuznetsov@live.ru"]')).toBeTruthy()
   })

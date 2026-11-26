@@ -6,6 +6,7 @@ import {
   googlePrivacyPolicyUrl,
   operatorName,
   privacyUpdatedAt,
+  publicSiteDisplayUrl,
   publicSiteUrl,
 } from '../legal/details'
 </script>
@@ -15,7 +16,7 @@ import {
     <p>
       Настоящая Политика описывает, какие данные обрабатывает сайт Doska (далее — Сайт),
       доступный по адресу
-      <a class="link" :href="publicSiteUrl">{{ publicSiteUrl }}</a>, зачем они нужны, кому
+      <a class="link" :href="publicSiteUrl">{{ publicSiteDisplayUrl }}</a>, зачем они нужны, кому
       передаются и как пользователь может распорядиться своими данными.
     </p>
 
@@ -186,7 +187,7 @@ import {
     <h2>9. Контакт</h2>
     <p>
       {{ operatorName }}<br />
-      Сайт: <a class="link" :href="publicSiteUrl">{{ publicSiteUrl }}</a><br />
+      Сайт: <a class="link" :href="publicSiteUrl">{{ publicSiteDisplayUrl }}</a><br />
       Email: <a class="link" :href="`mailto:${contactEmail}`">{{ contactEmail }}</a>
     </p>
   </LegalDocument>

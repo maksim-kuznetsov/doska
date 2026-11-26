@@ -5,6 +5,7 @@ import LegalDocument from '../components/LegalDocument.vue'
 import {
   contactEmail,
   operatorName,
+  publicSiteDisplayUrl,
   publicSiteUrl,
   termsUpdatedAt,
 } from '../legal/details'
@@ -14,7 +15,7 @@ import {
   <LegalDocument title="Условия использования" :updated-at="termsUpdatedAt">
     <p>
       Настоящие Условия регулируют использование сайта Doska (далее — Сайт), доступного
-      по адресу <a class="link" :href="publicSiteUrl">{{ publicSiteUrl }}</a>. Использование
+      по адресу <a class="link" :href="publicSiteUrl">{{ publicSiteDisplayUrl }}</a>. Использование
       Сайта, регистрация и вход через Google означают, что пользователь принял Условия
       и <RouterLink class="link" to="/privacy">Политику конфиденциальности</RouterLink>.
       Если пользователь не согласен с ними, он должен прекратить использование Сайта.
@@ -141,7 +142,7 @@ import {
     <h2>9. Контакт</h2>
     <p>
       {{ operatorName }}<br />
-      Сайт: <a class="link" :href="publicSiteUrl">{{ publicSiteUrl }}</a><br />
+      Сайт: <a class="link" :href="publicSiteUrl">{{ publicSiteDisplayUrl }}</a><br />
       Email: <a class="link" :href="`mailto:${contactEmail}`">{{ contactEmail }}</a>
     </p>
   </LegalDocument>
