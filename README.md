@@ -192,6 +192,28 @@ setx DOSKA_PROD_DOMAIN "doska.example.com"      # без схемы
 ssh "$DOSKA_PROD_SSH" 'cd /srv/doska && bash deploy/release.sh'
 ```
 
+## Правовые страницы и проверка Google OAuth
+
+Политика конфиденциальности доступна по адресу `/privacy`, условия использования — по `/terms`.
+Страницы открываются без входа и не обращаются к API, поэтому их можно указывать в Google Cloud
+Console при настройке входа через Google.
+
+- Локально: http://localhost:5173/privacy и http://localhost:5173/terms.
+- В production: `<публичный адрес сайта>/privacy` и `<публичный адрес сайта>/terms`.
+
+Порядок настройки OAuth-приложения:
+
+1. Откройте Google Cloud Console → **APIs & Services** → **OAuth consent screen**.
+2. В поле **Privacy policy URL** укажите `<публичный адрес сайта>/privacy`.
+3. В поле **Terms of service URL** укажите `<публичный адрес сайта>/terms`.
+4. Проверьте, что страницы открываются в браузере без входа на сайт, и отправьте приложение
+   на проверку.
+
+Реквизиты оператора, контакт, публичный адрес и даты редакции задаются в
+`frontend/src/legal/details.ts`; тексты документов — в `frontend/src/views/PrivacyPolicyView.vue`
+и `frontend/src/views/TermsOfServiceView.vue`. При изменении обработки данных обновите текст
+и дату редакции.
+
 ## Окружения и настройки
 
 - Окружение задаётся переменной `ASPNETCORE_ENVIRONMENT`: `Development` для локальной работы,

@@ -520,7 +520,28 @@ sudo grep 'client intended to send too large body' /var/log/nginx/error.log
 docker compose -f docker-compose.prod.yml exec caddy caddy list-certificates
 ```
 
-## 8. Обслуживание сервера
+## 8. Правовые страницы и проверка Google OAuth
+
+После публикации проверьте, что политика и условия открываются без входа:
+
+```bash
+curl -fsS https://<публичный-домен>/privacy | grep -q '<div id="app">'
+curl -fsS https://<публичный-домен>/terms | grep -q '<div id="app">'
+```
+
+Обе страницы отдаёт nginx по SPA-fallback, отдельная настройка не нужна. Если ответ `404`,
+проверьте `location /` и `try_files` в `deploy/nginx.conf` и что контейнер `web` пересобран.
+
+В Google Cloud Console → **APIs & Services** → **OAuth consent screen**:
+
+1. **Privacy policy URL** — `https://<публичный-домен>/privacy`.
+2. **Terms of service URL** — `https://<публичный-домен>/terms`.
+3. Убедитесь, что страницы открываются без входа, и отправьте приложение на проверку.
+
+Реквизиты и даты редакции меняются в `frontend/src/legal/details.ts`; после изменения текстов
+пересоберите и выложите `web` обычным релизом.
+
+## 9. Обслуживание сервера
 
 - Обновляйте пакеты ОС: `sudo apt update && sudo apt upgrade -y`, затем при необходимости перезагрузка.
 - Контейнеры с `restart: unless-stopped` поднимаются после перезагрузки автоматически.

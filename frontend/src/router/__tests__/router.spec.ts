@@ -21,4 +21,20 @@ describe('Маршруты объявлений и заглушка', () => {
     expect(resolved.name).toBe('not-found')
     expect(resolved.matched.some((record) => record.path === '/')).toBe(true)
   })
+
+  it('открывает политику конфиденциальности без требования входа', () => {
+    const resolved = router.resolve('/privacy')
+
+    expect(resolved.name).toBe('privacy')
+    expect(resolved.meta.requiresAuth).toBeUndefined()
+    expect(resolved.matched.some((record) => record.path === '/')).toBe(true)
+  })
+
+  it('открывает условия использования без требования входа', () => {
+    const resolved = router.resolve('/terms')
+
+    expect(resolved.name).toBe('terms')
+    expect(resolved.meta.requiresAuth).toBeUndefined()
+    expect(resolved.matched.some((record) => record.path === '/')).toBe(true)
+  })
 })

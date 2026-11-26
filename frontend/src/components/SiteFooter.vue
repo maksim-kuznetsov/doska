@@ -15,6 +15,8 @@ const isDev = import.meta.env.DEV
       <nav class="site-footer__links" aria-label="Дополнительно">
         <RouterLink to="/ads/new">Подать объявление</RouterLink>
         <RouterLink to="/ads/mine">Мои объявления</RouterLink>
+        <RouterLink to="/privacy">Политика конфиденциальности</RouterLink>
+        <RouterLink to="/terms">Условия использования</RouterLink>
         <RouterLink v-if="isDev" to="/design-system">Дизайн-система</RouterLink>
       </nav>
     </div>

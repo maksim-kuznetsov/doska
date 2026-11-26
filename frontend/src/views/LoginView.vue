@@ -64,6 +64,13 @@ async function submit(): Promise<void> {
     </form>
 
     <p class="text-muted">
+      Продолжая, вы принимаете
+      <RouterLink class="link" to="/terms">условия использования</RouterLink>
+      и
+      <RouterLink class="link" to="/privacy">политику конфиденциальности</RouterLink>.
+    </p>
+
+    <p class="text-muted">
       <RouterLink class="link" to="/forgot-password">Забыли пароль?</RouterLink>
     </p>
 

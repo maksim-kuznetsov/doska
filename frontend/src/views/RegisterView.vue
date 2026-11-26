@@ -72,6 +72,13 @@ async function submit(): Promise<void> {
         подача объявлений и жалобы недоступны.
       </p>
 
+      <p class="text-muted">
+        Регистрируясь, вы принимаете
+        <RouterLink class="link" to="/terms">условия использования</RouterLink>
+        и
+        <RouterLink class="link" to="/privacy">политику конфиденциальности</RouterLink>.
+      </p>
+
       <AppMessage v-if="error" variant="error">{{ error }}</AppMessage>
 
       <AppButton variant="primary" type="submit" block :disabled="submitting">

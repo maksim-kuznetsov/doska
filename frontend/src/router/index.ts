@@ -19,10 +19,12 @@ import LoginView from '../views/LoginView.vue'
 import ModerationQueueView from '../views/ModerationQueueView.vue'
 import MyAdsView from '../views/MyAdsView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
+import PrivacyPolicyView from '../views/PrivacyPolicyView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import ResendConfirmationView from '../views/ResendConfirmationView.vue'
 import ResetPasswordView from '../views/ResetPasswordView.vue'
+import TermsOfServiceView from '../views/TermsOfServiceView.vue'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -63,6 +65,16 @@ const routes: RouteRecordRaw[] = [
         path: 'resend-confirmation',
         name: 'resend-confirmation',
         component: ResendConfirmationView,
+      },
+      {
+        path: 'privacy',
+        name: 'privacy',
+        component: PrivacyPolicyView,
+      },
+      {
+        path: 'terms',
+        name: 'terms',
+        component: TermsOfServiceView,
       },
       {
         path: 'ads/new',
