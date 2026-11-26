@@ -20,11 +20,30 @@ public sealed record AdminUserView(
 /// <summary>Административное управление учётными записями.</summary>
 public sealed class UserService(IAppDbContext db, TimeProvider clock)
 {
-    /// <summary>Список пользователей для администратора.</summary>
-    public async Task<IReadOnlyList<AdminUserView>> GetListAsync(
+    /// <summary>Количество пользователей на странице по умолчанию.</summary>
+    public const int DefaultPageSize = 20;
+
+    /// <summary>Максимальный размер страницы.</summary>
+    public const int MaxPageSize = 100;
+
+    /// <summary>Страница пользователей для администратора.</summary>
+    public async Task<PagedResult<AdminUserView>> GetListAsync(
+        int page,
+        int pageSize,
         CancellationToken cancellationToken = default)
-        => await db.Users
+    {
+        var normalizedPage = page > 0 ? page : 1;
+        var normalizedPageSize = pageSize > 0
+            ? Math.Min(pageSize, MaxPageSize)
+            : DefaultPageSize;
+
+        var users = db.Users;
+        var totalCount = await users.CountAsync(cancellationToken);
+
+        var items = await users
             .OrderBy(user => user.Email)
+            .Skip((normalizedPage - 1) * normalizedPageSize)
+            .Take(normalizedPageSize)
             .Select(user => new AdminUserView(
                 user.Id,
                 user.Email,
@@ -35,6 +54,9 @@ public sealed class UserService(IAppDbContext db, TimeProvider clock)
                 user.DisplayName,
                 user.Contacts))
             .ToListAsync(cancellationToken);
+
+        return new PagedResult<AdminUserView>(items, totalCount, normalizedPage, normalizedPageSize);
+    }
 
     /// <summary>Возвращает сведения о пользователе для администратора.</summary>
     public async Task<AdminUserView> GetByIdAsync(

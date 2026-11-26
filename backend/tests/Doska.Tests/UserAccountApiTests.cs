@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Doska.Application.Abstractions;
+using Doska.Application.Accounts;
 using Doska.Domain.Entities;
 using Doska.Domain.Enums;
 using Doska.Infrastructure.Persistence;
@@ -394,8 +395,8 @@ public sealed class UserAccountApiTests : IClassFixture<ApiFactory>, IAsyncLifet
 
         var targetEmail = await RegisterAsync(_factory.CreateClient(), ct);
 
-        var list = await admin.GetFromJsonAsync<List<AdminUserPayload>>("/api/admin/users", ct);
-        var target = Assert.Single(list!, user => user.Email == targetEmail);
+        var list = await admin.GetFromJsonAsync<AdminUserPage>("/api/admin/users", ct);
+        var target = Assert.Single(list!.Items, user => user.Email == targetEmail);
         Assert.Equal("User", target.Role);
 
         var change = await admin.PutJsonAsync(
@@ -551,13 +552,37 @@ public sealed class UserAccountApiTests : IClassFixture<ApiFactory>, IAsyncLifet
         Assert.Equal(HttpStatusCode.Unauthorized, (await user.GetAsync("/api/ads/mine", ct)).StatusCode);
     }
 
+    [Fact]
+    public async Task Admin_user_list_is_paginated()
+    {
+        await EnsureDatabaseAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        using var admin = _factory.CreateClient();
+        await LoginAsync(admin, await CreateStaffAsync(UserRole.Admin, ct), ct);
+
+        var first = await admin.GetFromJsonAsync<AdminUserPage>("/api/admin/users?page=1&pageSize=1", ct);
+        Assert.NotNull(first);
+        Assert.Equal(1, first!.Page);
+        Assert.Equal(1, first.PageSize);
+        Assert.Single(first.Items);
+        Assert.True(first.TotalCount >= 1);
+
+        var capped = await admin.GetFromJsonAsync<AdminUserPage>("/api/admin/users?page=1&pageSize=100000", ct);
+        Assert.Equal(UserService.MaxPageSize, capped!.PageSize);
+
+        var beyond = await admin.GetFromJsonAsync<AdminUserPage>("/api/admin/users?page=99999&pageSize=1", ct);
+        Assert.Empty(beyond!.Items);
+        Assert.Equal(first.TotalCount, beyond.TotalCount);
+    }
+
     private async Task<AdminUserPayload> FindUserAsync(
         HttpClient admin,
         string email,
         CancellationToken cancellationToken)
     {
-        var users = await admin.GetFromJsonAsync<List<AdminUserPayload>>("/api/admin/users", cancellationToken);
-        return Assert.Single(users!, user => user.Email == email);
+        var page = await admin.GetFromJsonAsync<AdminUserPage>("/api/admin/users", cancellationToken);
+        return Assert.Single(page!.Items, user => user.Email == email);
     }
 
     private async Task EnsureDatabaseAsync()
@@ -647,6 +672,12 @@ public sealed class UserAccountApiTests : IClassFixture<ApiFactory>, IAsyncLifet
     }
 
     private sealed record CurrentUserPayload(Guid Id, string Email, bool IsEmailConfirmed);
+
+    private sealed record AdminUserPage(
+        List<AdminUserPayload> Items,
+        int TotalCount,
+        int Page,
+        int PageSize);
 
     private sealed record AdminUserPayload(
         Guid Id,

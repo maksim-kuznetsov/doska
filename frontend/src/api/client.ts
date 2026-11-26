@@ -391,7 +391,15 @@ export const api = {
     unblock: (id: string) => request<CurrentUser>(`/users/${id}/unblock`, { method: 'POST' }),
   },
   adminUsers: {
-    list: () => request<AdminUserView[]>('/admin/users'),
+    list: (page: number, pageSize?: number) => {
+      const search = new URLSearchParams({ page: String(page) })
+
+      if (pageSize !== undefined) {
+        search.set('pageSize', String(pageSize))
+      }
+
+      return request<PagedResult<AdminUserView>>(`/admin/users?${search.toString()}`)
+    },
     get: (id: string) => request<AdminUserView>(`/admin/users/${id}`),
     update: (id: string, payload: AdminUserUpdatePayload) =>
       request<AdminUserView>(`/admin/users/${id}`, { method: 'PUT', body: payload }),

@@ -305,6 +305,34 @@ const guideErrors = [
     </div>
 
     <div class="guide__section">
+      <h2 class="guide__section-title">Таблица данных</h2>
+      <div class="data-table-wrap">
+        <table class="data-table" data-test="guide-table">
+          <caption>Пример таблицы данных</caption>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Роль</th>
+              <th>Статус</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>user@example.com</td>
+              <td>Пользователь</td>
+              <td><StatusBadge status="Active" /></td>
+            </tr>
+            <tr>
+              <td>blocked@example.com</td>
+              <td>Модератор</td>
+              <td><StatusBadge status="Hidden" /></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="guide__section">
       <h2 class="guide__section-title">Сообщения</h2>
       <AppMessage variant="success">Действие выполнено.</AppMessage>
       <AppMessage variant="error">Не удалось выполнить действие.</AppMessage>

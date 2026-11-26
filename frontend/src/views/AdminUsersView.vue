@@ -1,16 +1,22 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 import { api, type AdminUserView } from '../api/client'
 import { messageOf } from '../api/errors'
 import AppMessage from '../components/AppMessage.vue'
 import Breadcrumbs from '../components/Breadcrumbs.vue'
 import EmptyState from '../components/EmptyState.vue'
+import Pagination from '../components/Pagination.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 
 const users = ref<AdminUserView[]>([])
+const page = ref(1)
+const pageSize = ref(20)
+const totalCount = ref(0)
 const error = ref('')
 const loading = ref(false)
+
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)))
 
 const roleLabels: Record<string, string> = {
   User: 'Пользователь',
@@ -22,12 +28,16 @@ function formatRole(role: string): string {
   return roleLabels[role] ?? role
 }
 
-async function load(): Promise<void> {
+async function load(targetPage = 1): Promise<void> {
   loading.value = true
   error.value = ''
 
   try {
-    users.value = await api.adminUsers.list()
+    const result = await api.adminUsers.list(targetPage)
+    users.value = result.items
+    page.value = result.page
+    pageSize.value = result.pageSize
+    totalCount.value = result.totalCount
   } catch (cause) {
     error.value = messageOf(cause, 'Не удалось загрузить пользователей.')
   } finally {
@@ -35,7 +45,7 @@ async function load(): Promise<void> {
   }
 }
 
-onMounted(load)
+onMounted(() => load(1))
 </script>
 
 <template>
@@ -57,30 +67,48 @@ onMounted(load)
       description="Зарегистрированные пользователи появятся здесь."
     />
 
-    <div v-if="users.length > 0" class="item-list">
-      <article v-for="user in users" :key="user.id" class="panel stack" data-test="admin-user">
-        <div class="split">
-          <h2 class="item-row__title">{{ user.email }}</h2>
-          <div class="cluster">
-            <StatusBadge :status="user.isBlocked ? 'Hidden' : 'Active'" />
-          </div>
-        </div>
+    <template v-if="!loading && users.length > 0">
+      <div class="data-table-wrap">
+        <table class="data-table" data-test="admin-users-table">
+          <caption class="visually-hidden">Пользователи</caption>
+          <thead>
+            <tr>
+              <th scope="col">Email</th>
+              <th scope="col">Имя</th>
+              <th scope="col">Роль</th>
+              <th scope="col">Доверие</th>
+              <th scope="col">Email подтверждён</th>
+              <th scope="col">Статус</th>
+              <th scope="col">Контакты</th>
+              <th scope="col"><span class="visually-hidden">Действия</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="user in users" :key="user.id" data-test="admin-user">
+              <td>{{ user.email }}</td>
+              <td>{{ user.displayName || '—' }}</td>
+              <td>{{ formatRole(user.role) }}</td>
+              <td>{{ user.isTrusted ? 'Да' : 'Нет' }}</td>
+              <td>{{ user.isEmailConfirmed ? 'Да' : 'Нет' }}</td>
+              <td><StatusBadge :status="user.isBlocked ? 'Hidden' : 'Active'" /></td>
+              <td>{{ user.contacts || '—' }}</td>
+              <td>
+                <RouterLink class="btn btn--secondary btn--compact" :to="`/admin/users/${user.id}`">
+                  Редактировать
+                </RouterLink>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-        <p class="text-muted">
-          Роль: {{ formatRole(user.role) }} · {{ user.isTrusted ? 'доверенный' : 'без доверия' }} ·
-          {{ user.isEmailConfirmed ? 'email подтверждён' : 'email не подтверждён' }}
-        </p>
-
-        <p class="text-muted">
-          Имя: {{ user.displayName || 'не задано' }} · Контакты: {{ user.contacts || 'не заданы' }}
-        </p>
-
-        <div class="cluster">
-          <RouterLink class="btn btn--secondary btn--compact" :to="`/admin/users/${user.id}`">
-            Редактировать
-          </RouterLink>
-        </div>
-      </article>
-    </div>
+      <Pagination
+        v-if="totalPages > 1"
+        :page="page"
+        :total-pages="totalPages"
+        :total-count="totalCount"
+        @change="load"
+      />
+    </template>
   </section>
 </template>
