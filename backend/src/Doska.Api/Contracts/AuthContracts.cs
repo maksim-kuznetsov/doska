@@ -24,9 +24,23 @@ public sealed record ResetPasswordRequest(string Token, string Password);
 public sealed record CsrfResponse(string Token);
 
 /// <summary>Сведения о текущем пользователе.</summary>
-public sealed record UserResponse(Guid Id, string Email, string Role, bool IsTrusted, bool IsEmailConfirmed)
+public sealed record UserResponse(
+    Guid Id,
+    string Email,
+    string Role,
+    bool IsTrusted,
+    bool IsEmailConfirmed,
+    string? DisplayName,
+    string? Contacts)
 {
     /// <summary>Создаёт ответ из сведений о пользователе.</summary>
     public static UserResponse From(AuthenticatedUser user)
-        => new(user.Id, user.Email, user.Role, user.IsTrusted, user.IsEmailConfirmed);
+        => new(
+            user.Id,
+            user.Email,
+            user.Role,
+            user.IsTrusted,
+            user.IsEmailConfirmed,
+            user.DisplayName,
+            user.Contacts);
 }

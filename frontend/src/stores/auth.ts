@@ -39,6 +39,10 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
   }
 
+  async function updateProfile(displayName: string | null, contacts: string | null): Promise<void> {
+    user.value = await api.account.updateProfile(displayName, contacts)
+  }
+
   return {
     user,
     loaded,
@@ -49,5 +53,6 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     register,
     logout,
+    updateProfile,
   }
 })

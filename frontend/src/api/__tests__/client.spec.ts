@@ -89,3 +89,38 @@ describe('api.ads.search', () => {
     )
   })
 })
+
+describe('api.account', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('сохраняет профиль через PUT и возвращает пользователя', async () => {
+    const user = { id: 'user-1', email: 'user@example.com', displayName: 'Иван', contacts: '+7 900' }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ token: 'csrf' }))
+      .mockResolvedValueOnce(jsonResponse(user))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(api.account.updateProfile('Иван', '+7 900')).resolves.toEqual(user)
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/account/profile',
+      expect.objectContaining({ method: 'PUT', credentials: 'include' }),
+    )
+  })
+
+  it('меняет пароль через POST и не требует тела ответа', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ token: 'csrf' }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(api.account.changePassword('oldpass1', 'newpass1')).resolves.toBeUndefined()
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/account/password',
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
+    )
+  })
+})

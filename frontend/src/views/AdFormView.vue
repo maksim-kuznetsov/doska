@@ -17,8 +17,10 @@ import SubsectionSelect from '../components/SubsectionSelect.vue'
 import TextAreaField from '../components/TextAreaField.vue'
 import TextField from '../components/TextField.vue'
 import type { FormError } from '../components/formErrors'
+import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
+const auth = useAuthStore()
 
 const cities = ref<CityOption[]>([])
 const sections = ref<SectionOption[]>([])
@@ -38,6 +40,8 @@ const form = reactive({
 })
 
 onMounted(async () => {
+  prefillContacts()
+
   try {
     const [cityList, sectionList] = await Promise.all([
       api.catalog.cities(),
@@ -49,6 +53,18 @@ onMounted(async () => {
     catalogError.value = 'Не удалось загрузить города и категории.'
   }
 })
+
+/** Подставляет имя и контакты профиля в пустое поле контактов в формате «имя контакты». */
+function prefillContacts(): void {
+  if (form.contacts.trim().length > 0) {
+    return
+  }
+
+  form.contacts = [auth.user?.displayName, auth.user?.contacts]
+    .map((part) => part?.trim() ?? '')
+    .filter((part) => part.length > 0)
+    .join(' ')
+}
 
 function validate(): FormError[] {
   const errors: FormError[] = []

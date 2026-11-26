@@ -14,11 +14,20 @@ public sealed record AuthenticatedUser(
     string Email,
     string Role,
     bool IsTrusted,
-    bool IsEmailConfirmed)
+    bool IsEmailConfirmed,
+    string? DisplayName,
+    string? Contacts)
 {
     /// <summary>Создаёт сведения о пользователе из сущности.</summary>
     public static AuthenticatedUser From(User user)
-        => new(user.Id, user.Email, user.Role.ToString(), user.IsTrusted, user.IsEmailConfirmed);
+        => new(
+            user.Id,
+            user.Email,
+            user.Role.ToString(),
+            user.IsTrusted,
+            user.IsEmailConfirmed,
+            user.DisplayName,
+            user.Contacts);
 }
 
 /// <summary>Регистрация, вход и подтверждение email.</summary>

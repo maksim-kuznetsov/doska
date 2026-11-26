@@ -9,6 +9,8 @@ export interface CurrentUser {
   role: 'User' | 'Moderator' | 'Admin'
   isTrusted: boolean
   isEmailConfirmed: boolean
+  displayName: string | null
+  contacts: string | null
 }
 
 export interface AdPhotoSummary {
@@ -319,6 +321,15 @@ export const api = {
     resetPassword: (token: string, password: string) =>
       request<void>('/auth/reset-password', { method: 'POST', body: { token, password } }),
     logout: () => request<void>('/auth/logout', { method: 'POST' }),
+  },
+  account: {
+    updateProfile: (displayName: string | null, contacts: string | null) =>
+      request<CurrentUser>('/account/profile', { method: 'PUT', body: { displayName, contacts } }),
+    changePassword: (currentPassword: string, newPassword: string) =>
+      request<void>('/account/password', {
+        method: 'POST',
+        body: { currentPassword, newPassword },
+      }),
   },
   catalog: {
     cities: () => request<CityOption[]>('/catalog/cities'),

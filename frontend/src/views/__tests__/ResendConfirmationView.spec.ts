@@ -43,6 +43,8 @@ async function mountView(userEmail?: string) {
       role: 'User',
       isTrusted: false,
       isEmailConfirmed: false,
+      displayName: null,
+      contacts: null,
     }
   }
 

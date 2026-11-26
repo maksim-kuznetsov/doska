@@ -137,6 +137,7 @@ builder.Services.AddScoped<IEmailOutbox, FileEmailOutbox>();
 
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<AdService>();
 builder.Services.AddScoped<AdSearchService>();
 builder.Services.AddScoped<CatalogService>();

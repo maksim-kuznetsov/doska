@@ -341,9 +341,19 @@ namespace Doska.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("blocked_at");
 
+                    b.Property<string>("Contacts")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("contacts");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("display_name");
 
                     b.Property<string>("Email")
                         .IsRequired()

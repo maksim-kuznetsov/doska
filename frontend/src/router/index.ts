@@ -19,6 +19,7 @@ import LoginView from '../views/LoginView.vue'
 import ModerationQueueView from '../views/ModerationQueueView.vue'
 import MyAdsView from '../views/MyAdsView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
+import ProfileView from '../views/ProfileView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import ResendConfirmationView from '../views/ResendConfirmationView.vue'
 import ResetPasswordView from '../views/ResetPasswordView.vue'
@@ -73,6 +74,12 @@ const routes: RouteRecordRaw[] = [
         path: 'ads/mine',
         name: 'ads-mine',
         component: MyAdsView,
+        meta: { requiresAuth: true },
+      },
+      {
+        path: 'profile',
+        name: 'profile',
+        component: ProfileView,
         meta: { requiresAuth: true },
       },
       {

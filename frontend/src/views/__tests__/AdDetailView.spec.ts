@@ -72,6 +72,8 @@ async function mountView(options: { authenticated?: boolean } = {}) {
       role: 'User',
       isTrusted: false,
       isEmailConfirmed: true,
+      displayName: null,
+      contacts: null,
     }
   }
 

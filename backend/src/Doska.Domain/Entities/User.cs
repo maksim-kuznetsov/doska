@@ -29,6 +29,12 @@ public class User : Entity
     /// <summary>Момент блокировки; <c>null</c> — пользователь не заблокирован.</summary>
     public DateTimeOffset? BlockedAt { get; private set; }
 
+    /// <summary>Отображаемое имя пользователя; <c>null</c> — не задано.</summary>
+    public string? DisplayName { get; private set; }
+
+    /// <summary>Контактные данные профиля в свободной форме; <c>null</c> — не заданы.</summary>
+    public string? Contacts { get; private set; }
+
     /// <summary>Объявления пользователя.</summary>
     public ICollection<Ad> Ads { get; } = new List<Ad>();
 
@@ -140,5 +146,25 @@ public class User : Entity
     {
         BlockedAt = null;
         MarkUpdated(now);
+    }
+
+    /// <summary>
+    /// Обновляет профиль пользователя: отображаемое имя и контакты. Пустые значения
+    /// (после обрезки пробелов) сохраняются как <c>null</c>.
+    /// </summary>
+    /// <param name="displayName">Новое отображаемое имя.</param>
+    /// <param name="contacts">Новые контакты.</param>
+    /// <param name="now">Момент изменения.</param>
+    public void UpdateProfile(string? displayName, string? contacts, DateTimeOffset now)
+    {
+        DisplayName = Normalize(displayName);
+        Contacts = Normalize(contacts);
+        MarkUpdated(now);
+    }
+
+    private static string? Normalize(string? value)
+    {
+        var trimmed = value?.Trim();
+        return string.IsNullOrEmpty(trimmed) ? null : trimmed;
     }
 }

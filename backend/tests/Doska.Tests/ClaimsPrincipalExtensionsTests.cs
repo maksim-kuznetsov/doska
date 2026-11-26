@@ -16,7 +16,9 @@ public sealed class ClaimsPrincipalExtensionsTests
             "moderator@example.com",
             "Moderator",
             IsTrusted: true,
-            IsEmailConfirmed: true);
+            IsEmailConfirmed: true,
+            DisplayName: "Модератор",
+            Contacts: null);
 
         var principal = ClaimsPrincipalExtensions.CreateSessionPrincipal(user);
 

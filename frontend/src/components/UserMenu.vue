@@ -34,6 +34,12 @@ function logout(close: () => void): void {
 
     <template #default="{ close }">
       <div class="dropdown__group">
+        <p class="dropdown__group-title">Аккаунт</p>
+        <RouterLink class="dropdown__item" to="/profile" @click="close">Профиль</RouterLink>
+      </div>
+
+      <hr class="dropdown__divider" />
+      <div class="dropdown__group">
         <p class="dropdown__group-title">Объявления</p>
         <RouterLink class="dropdown__item" to="/ads/mine" @click="close">Мои объявления</RouterLink>
       </div>
