@@ -90,4 +90,53 @@ public sealed class UserGoogleDomainTests
         Assert.Equal("new-hash", user.PasswordHash);
         Assert.Equal(Now, user.UpdatedAt);
     }
+
+    [Fact]
+    public void ApplyGoogleDisplayName_fills_empty_name_and_updates_timestamp()
+    {
+        var user = User.CreateWithGoogle("user@example.com", "google-subject", "placeholder", Created);
+
+        user.ApplyGoogleDisplayName("  Иван Иванов  ", Now);
+
+        Assert.Equal("Иван Иванов", user.DisplayName);
+        Assert.Equal(Now, user.UpdatedAt);
+    }
+
+    [Fact]
+    public void ApplyGoogleDisplayName_does_not_overwrite_existing_name()
+    {
+        var user = User.CreateWithGoogle("user@example.com", "google-subject", "placeholder", Created);
+        user.UpdateProfile("Заданное имя", null, Created);
+
+        user.ApplyGoogleDisplayName("Другое имя", Now);
+
+        Assert.Equal("Заданное имя", user.DisplayName);
+        Assert.Equal(Created, user.UpdatedAt);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ApplyGoogleDisplayName_ignores_blank_name(string? displayName)
+    {
+        var user = User.CreateWithGoogle("user@example.com", "google-subject", "placeholder", Created);
+
+        user.ApplyGoogleDisplayName(displayName, Now);
+
+        Assert.Null(user.DisplayName);
+        Assert.Equal(Created, user.UpdatedAt);
+    }
+
+    [Fact]
+    public void ApplyGoogleDisplayName_ignores_too_long_name()
+    {
+        var user = User.CreateWithGoogle("user@example.com", "google-subject", "placeholder", Created);
+        var tooLong = new string('я', User.MaxDisplayNameLength + 1);
+
+        user.ApplyGoogleDisplayName(tooLong, Now);
+
+        Assert.Null(user.DisplayName);
+        Assert.Equal(Created, user.UpdatedAt);
+    }
 }

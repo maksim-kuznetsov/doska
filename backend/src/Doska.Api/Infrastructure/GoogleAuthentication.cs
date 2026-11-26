@@ -23,6 +23,9 @@ public static class GoogleAuthentication
     /// <summary>Пользовательский claim с подтверждённым email Google.</summary>
     public const string EmailClaim = "google_email";
 
+    /// <summary>Пользовательский claim с именем пользователя из Google.</summary>
+    public const string NameClaim = "google_name";
+
     /// <summary>Пользовательский claim с признаком подтверждения email Google.</summary>
     public const string EmailVerifiedClaim = "google_email_verified";
 
@@ -59,6 +62,7 @@ public static class GoogleAuthentication
         {
             ReplaceClaim(identity, SubjectClaim, ReadString(context.User, "sub"));
             ReplaceClaim(identity, EmailClaim, ReadString(context.User, "email"));
+            ReplaceClaim(identity, NameClaim, ReadString(context.User, "name"));
             ReplaceClaim(
                 identity,
                 EmailVerifiedClaim,
@@ -84,6 +88,7 @@ public static class GoogleAuthentication
             var principal = context.Principal;
             var subject = principal?.FindFirst(SubjectClaim)?.Value;
             var email = principal?.FindFirst(EmailClaim)?.Value;
+            var displayName = principal?.FindFirst(NameClaim)?.Value;
             var emailVerified = bool.TryParse(
                 principal?.FindFirst(EmailVerifiedClaim)?.Value,
                 out var verified) && verified;
@@ -128,6 +133,7 @@ public static class GoogleAuthentication
                     linkUserId,
                     subject,
                     email,
+                    displayName,
                     emailVerified,
                     context.HttpContext.RequestAborted);
             }
@@ -136,6 +142,7 @@ public static class GoogleAuthentication
                 user = await googleAuth.SignInAsync(
                     subject,
                     email,
+                    displayName,
                     emailVerified,
                     context.HttpContext.RequestAborted);
             }

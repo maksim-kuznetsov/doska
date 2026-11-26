@@ -1,6 +1,7 @@
 using Doska.Application.Abstractions;
 using Doska.Application.Auth;
 using Doska.Application.Common;
+using Doska.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Doska.Application.Accounts;
@@ -11,8 +12,8 @@ public sealed class ProfileService(
     IPasswordHasher passwordHasher,
     TimeProvider clock)
 {
-    /// <summary>Максимальная длина отображаемого имени.</summary>
-    public const int MaxDisplayNameLength = 100;
+    /// <summary>Максимальная длина отображаемого имени; совпадает с ограничением домена.</summary>
+    public const int MaxDisplayNameLength = User.MaxDisplayNameLength;
 
     /// <summary>Максимальная длина контактов; совпадает с ограничением контактов объявления.</summary>
     public const int MaxContactsLength = 500;

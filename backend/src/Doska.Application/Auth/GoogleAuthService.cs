@@ -26,6 +26,7 @@ public sealed class GoogleAuthService(
     public async Task<AuthenticatedUser> SignInAsync(
         string? googleSubject,
         string? email,
+        string? displayName,
         bool emailVerified,
         CancellationToken cancellationToken = default)
     {
@@ -64,6 +65,8 @@ public sealed class GoogleAuthService(
                 byEmail.ConfirmEmail(now);
             }
 
+            byEmail.ApplyGoogleDisplayName(displayName, now);
+
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
@@ -77,7 +80,9 @@ public sealed class GoogleAuthService(
 
         var placeholderHash = passwordHasher.Hash(
             Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32)));
-        var user = User.CreateWithGoogle(normalizedEmail, subject, placeholderHash, clock.GetUtcNow());
+        var createdAt = clock.GetUtcNow();
+        var user = User.CreateWithGoogle(normalizedEmail, subject, placeholderHash, createdAt);
+        user.ApplyGoogleDisplayName(displayName, createdAt);
 
         db.Users.Add(user);
 
@@ -100,6 +105,7 @@ public sealed class GoogleAuthService(
         Guid userId,
         string? googleSubject,
         string? email,
+        string? displayName,
         bool emailVerified,
         CancellationToken cancellationToken = default)
     {
@@ -140,6 +146,8 @@ public sealed class GoogleAuthService(
         {
             user.ConfirmEmail(now);
         }
+
+        user.ApplyGoogleDisplayName(displayName, now);
 
         try
         {

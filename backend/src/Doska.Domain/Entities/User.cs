@@ -8,6 +8,9 @@ public class User : Entity
     /// <summary>Число одобренных объявлений, после которого доверие выдаётся автоматически.</summary>
     public const int TrustThreshold = 3;
 
+    /// <summary>Максимальная длина отображаемого имени.</summary>
+    public const int MaxDisplayNameLength = 100;
+
     /// <summary>Адрес электронной почты; уникален, используется для входа.</summary>
     public string Email { get; private set; } = string.Empty;
 
@@ -214,6 +217,30 @@ public class User : Entity
     {
         DisplayName = Normalize(displayName);
         Contacts = Normalize(contacts);
+        MarkUpdated(now);
+    }
+
+    /// <summary>
+    /// Заполняет отображаемое имя из внешней идентичности Google, только если оно ещё не задано.
+    /// Пустое или слишком длинное значение игнорируется, заданное имя не перезаписывается.
+    /// </summary>
+    /// <param name="displayName">Имя из Google.</param>
+    /// <param name="now">Момент изменения.</param>
+    public void ApplyGoogleDisplayName(string? displayName, DateTimeOffset now)
+    {
+        if (DisplayName is not null)
+        {
+            return;
+        }
+
+        var normalized = Normalize(displayName);
+
+        if (normalized is null || normalized.Length > MaxDisplayNameLength)
+        {
+            return;
+        }
+
+        DisplayName = normalized;
         MarkUpdated(now);
     }
 
