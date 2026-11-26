@@ -42,7 +42,8 @@ describe('AdminCitiesView', () => {
     expect(wrapper.text()).toContain('Тверь')
     expect(wrapper.text()).toContain('Доступен при подаче')
     expect(wrapper.text()).toContain('Скрыт из выбора')
-    expect(wrapper.find('.breadcrumbs').text()).toContain('Города')
+    expect(wrapper.find('.breadcrumbs').text()).toContain('Главная')
+    expect(wrapper.find('.breadcrumbs').text()).not.toContain('Города')
   })
 
   it('сообщает о пустом справочнике', async () => {

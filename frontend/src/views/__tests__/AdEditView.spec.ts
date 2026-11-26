@@ -55,6 +55,7 @@ describe('AdEditView', () => {
       createdAt: '2026-11-19T00:00:00Z',
       publishedAt: '2026-11-19T00:00:00Z',
       photos: [],
+      isOwn: true,
     })
     cities.mockResolvedValue([{ id: 'city-1', name: 'Москва' }])
     sections.mockResolvedValue([
@@ -65,7 +66,7 @@ describe('AdEditView', () => {
     await flushPromises()
 
     expect(wrapper.find('.breadcrumbs').text()).toContain('Мои объявления')
-    expect(wrapper.find('.breadcrumbs').text()).toContain('Редактировать объявление')
+    expect(wrapper.find('.breadcrumbs').text()).not.toContain('Редактировать объявление')
     expect((wrapper.find('#ad-title').element as HTMLInputElement).value).toBe('Велосипед')
   })
 })

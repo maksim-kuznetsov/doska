@@ -45,7 +45,8 @@ describe('AdminOutboxView', () => {
     expect(wrapper.findAll('[data-test="outbox-message"]')).toHaveLength(1)
     expect(wrapper.text()).toContain('Подтверждение email')
     expect(wrapper.text()).toContain('user@example.com')
-    expect(wrapper.find('.breadcrumbs').text()).toContain('Письма (outbox)')
+    expect(wrapper.find('.breadcrumbs').text()).toContain('Главная')
+    expect(wrapper.find('.breadcrumbs').text()).not.toContain('Письма (outbox)')
   })
 
   it('открывает выбранное письмо', async () => {

@@ -36,7 +36,8 @@ describe('AdminCategoriesView', () => {
     const wrapper = mount(AdminCategoriesView, { global: { plugins: [router] } })
     await flushPromises()
 
-    expect(wrapper.find('.breadcrumbs').text()).toContain('Категории')
+    expect(wrapper.find('.breadcrumbs').text()).toContain('Главная')
+    expect(wrapper.find('.breadcrumbs').text()).not.toContain('Категории')
     expect(wrapper.text()).toContain('Транспорт')
     expect(wrapper.text()).toContain('Автомобили')
   })

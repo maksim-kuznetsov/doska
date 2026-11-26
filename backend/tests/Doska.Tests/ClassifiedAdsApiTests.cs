@@ -439,6 +439,33 @@ public sealed class ClassifiedAdsApiTests : IClassFixture<ApiFactory>, IAsyncLif
     }
 
     [Fact]
+    public async Task Public_view_reports_whether_ad_belongs_to_viewer()
+    {
+        await EnsureDatabaseAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        using var author = _factory.CreateClient();
+        var authorUser = await RegisterAuthorAsync(author, ct);
+        var (cityId, categoryId) = await CreateCatalogAsync();
+        var activeId = await CreateDbAdAsync(
+            authorUser.Id,
+            categoryId,
+            cityId,
+            $"{AdPrefix}Активное с признаком авторства",
+            AdStatus.Active,
+            DateTimeOffset.UtcNow);
+
+        var ownView = await author.GetFromJsonAsync<AdPayload>($"/api/ads/{activeId}", ct);
+        Assert.NotNull(ownView);
+        Assert.True(ownView!.IsOwn);
+
+        using var stranger = _factory.CreateClient();
+        var strangerView = await stranger.GetFromJsonAsync<AdPayload>($"/api/ads/{activeId}", ct);
+        Assert.NotNull(strangerView);
+        Assert.False(strangerView!.IsOwn);
+    }
+
+    [Fact]
     public async Task Moderator_sees_non_active_ad_by_id()
     {
         await EnsureDatabaseAsync();
@@ -672,7 +699,8 @@ public sealed class ClassifiedAdsApiTests : IClassFixture<ApiFactory>, IAsyncLif
         decimal Price,
         string Status,
         string? ModerationReason,
-        List<PhotoPayload> Photos);
+        List<PhotoPayload> Photos,
+        bool IsOwn);
 
     private sealed record PhotoPayload(
         Guid Id,

@@ -87,7 +87,7 @@ onMounted(load)
 
 <template>
   <section class="page">
-    <Breadcrumbs :items="[{ label: 'Главная', to: '/' }, { label: 'Города' }]" />
+    <Breadcrumbs :items="[{ label: 'Главная', to: '/' }]" />
 
     <div class="page__head">
       <h1 class="page__title">Города</h1>

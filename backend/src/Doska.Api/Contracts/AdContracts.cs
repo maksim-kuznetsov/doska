@@ -61,7 +61,8 @@ public sealed record AdResponse(
     string? ModerationReason,
     DateTimeOffset CreatedAt,
     DateTimeOffset? PublishedAt,
-    IReadOnlyList<AdPhotoResponse> Photos)
+    IReadOnlyList<AdPhotoResponse> Photos,
+    bool IsOwn)
 {
     /// <summary>Создаёт ответ из представления объявления.</summary>
     public static AdResponse From(AdSummary ad)
@@ -87,5 +88,6 @@ public sealed record AdResponse(
                     photo.Width,
                     photo.Height,
                     photo.SortOrder))
-                .ToList());
+                .ToList(),
+            ad.IsOwn);
 }

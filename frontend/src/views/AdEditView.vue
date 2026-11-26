@@ -134,7 +134,6 @@ async function submit(): Promise<void> {
       :items="[
         { label: 'Главная', to: '/' },
         { label: 'Мои объявления', to: '/ads/mine' },
-        { label: 'Редактировать объявление' },
       ]"
     />
 

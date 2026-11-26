@@ -35,6 +35,7 @@ export interface AdSummary {
   createdAt: string
   publishedAt: string | null
   photos: AdPhotoSummary[]
+  isOwn: boolean
 }
 
 export interface CreateAdPayload {

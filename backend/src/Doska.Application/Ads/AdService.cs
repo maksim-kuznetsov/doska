@@ -39,7 +39,8 @@ public sealed record AdSummary(
     string? ModerationReason,
     DateTimeOffset CreatedAt,
     DateTimeOffset? PublishedAt,
-    IReadOnlyList<AdPhotoSummary> Photos);
+    IReadOnlyList<AdPhotoSummary> Photos,
+    bool IsOwn);
 
 /// <summary>Подача, редактирование и ведение объявлений автором.</summary>
 public sealed class AdService(
@@ -142,7 +143,7 @@ public sealed class AdService(
             .OrderByDescending(ad => ad.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return ads.Select(ToSummary).ToList();
+        return ads.Select(ad => ToSummary(ad, isOwn: true)).ToList();
     }
 
     /// <summary>
@@ -169,7 +170,7 @@ public sealed class AdService(
             throw new ServiceException(ServiceErrorKind.NotFound, "Объявление не найдено.");
         }
 
-        return ToSummary(ad);
+        return ToSummary(ad, isOwn: viewerId is not null && ad.AuthorId == viewerId);
     }
 
     /// <summary>Изменяет объявление автора; непроверенный автор возвращает его на проверку.</summary>
@@ -465,7 +466,7 @@ public sealed class AdService(
         }
     }
 
-    private static AdSummary ToSummary(Ad ad)
+    private static AdSummary ToSummary(Ad ad, bool isOwn = false)
         => new(
             ad.Id,
             ad.Title,
@@ -489,5 +490,6 @@ public sealed class AdService(
                     photo.Width,
                     photo.Height,
                     photo.SortOrder))
-                .ToList());
+                .ToList(),
+            isOwn);
 }

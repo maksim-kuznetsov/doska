@@ -1193,6 +1193,39 @@
   border-radius: var(--radius-sm);
 }
 
+/* Модальный диалог */
+.modal-dialog {
+  width: min(90vw, 32rem);
+  max-width: none;
+  padding: var(--space-5);
+  border: none;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.modal-dialog::backdrop {
+  background: var(--color-overlay);
+}
+
+.modal-dialog__title {
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.modal-dialog__body {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.modal-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
 /* Карточка модерации */
 .moderation-card {
   display: grid;

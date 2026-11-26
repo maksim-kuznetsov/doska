@@ -59,7 +59,8 @@ describe('AdminUsersView', () => {
     expect(wrapper.text()).toContain('user@example.com')
     expect(wrapper.text()).toContain('blocked@example.com')
     expect(wrapper.text()).toContain('Разблокировать')
-    expect(wrapper.find('.breadcrumbs').text()).toContain('Пользователи')
+    expect(wrapper.find('.breadcrumbs').text()).toContain('Главная')
+    expect(wrapper.find('.breadcrumbs').text()).not.toContain('Пользователи')
     expect(wrapper.findAll('[data-test="admin-user"]')[0].findAll('.status-badge')).toHaveLength(1)
   })
 

@@ -27,6 +27,7 @@ import FormSection from '../components/FormSection.vue'
 import ImageGallery from '../components/ImageGallery.vue'
 import ItemCard from '../components/ItemCard.vue'
 import ItemRow from '../components/ItemRow.vue'
+import ModalDialog from '../components/ModalDialog.vue'
 import ModerationQueueList from '../components/ModerationQueueList.vue'
 import Pagination from '../components/Pagination.vue'
 import PasswordHints from '../components/PasswordHints.vue'
@@ -97,6 +98,7 @@ const adSummary: AdSummary = {
   createdAt: '2026-11-18T10:00:00Z',
   publishedAt: null,
   photos: [],
+  isOwn: true,
 }
 
 function placeholderPhoto(order: number): AdPhotoSummary {
@@ -160,6 +162,7 @@ const guideFields = ref({ title: 'Название объявления', descri
 const guidePhotos = ref<File[]>([])
 const guideSort = ref<'newest' | 'price_asc' | 'price_desc'>('newest')
 const guidePassword = ref('secret123')
+const guideDialogOpen = ref(false)
 
 const guideErrors = [
   { fieldId: 'guide-title', label: 'Укажите заголовок.' },
@@ -306,11 +309,23 @@ const guideErrors = [
         :items="[
           { label: 'Главная', to: '/' },
           { label: 'Транспорт', to: '/?categoryId=s1' },
-          { label: 'Автомобили' },
         ]"
       />
       <Pagination :page="2" :total-pages="5" :total-count="57" />
       <EmptyState title="Ничего не найдено" description="Попробуйте изменить условия поиска." />
+    </div>
+
+    <div class="guide__section">
+      <h2 class="guide__section-title">Модальный диалог</h2>
+      <AppButton @click="guideDialogOpen = true">Открыть диалог</AppButton>
+      <ModalDialog
+        v-if="guideDialogOpen"
+        title="Пример диалога"
+        @confirm="guideDialogOpen = false"
+        @cancel="guideDialogOpen = false"
+      >
+        <p class="text-muted">Поле причины или текст подтверждения действия.</p>
+      </ModalDialog>
     </div>
 
     <div class="guide__section">
