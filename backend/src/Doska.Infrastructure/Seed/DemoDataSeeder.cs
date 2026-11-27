@@ -48,7 +48,9 @@ public static class DemoDataSeeder
 
         foreach (var (email, role) in DemoUsers)
         {
-            if (await db.Users.AnyAsync(user => user.Email == email, cancellationToken))
+            if (await db.Users.AnyAsync(
+                    user => user.Email.ToLower() == email.ToLower(),
+                    cancellationToken))
             {
                 continue;
             }

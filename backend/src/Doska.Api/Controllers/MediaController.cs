@@ -22,7 +22,10 @@ public sealed class MediaController(
     [HttpGet("{adId:guid}/{fileName}")]
     public IActionResult Get(Guid adId, string fileName)
     {
-        if (string.IsNullOrWhiteSpace(fileName) || Path.GetFileName(fileName) != fileName)
+        if (string.IsNullOrWhiteSpace(fileName)
+            || fileName is "." or ".."
+            || fileName.Any(symbol => !(char.IsAsciiLetterOrDigit(symbol) || symbol is '.' or '_' or '-'))
+            || Path.GetFileName(fileName) != fileName)
         {
             return NotFound();
         }

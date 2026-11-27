@@ -24,6 +24,10 @@ namespace Doska.Infrastructure.Migrations
                 nullable: false,
                 defaultValue: true);
 
+            // Значение по умолчанию нужно только для заполнения существующих строк.
+            // Дальше им управляет домен, поэтому убираем его из схемы.
+            migrationBuilder.Sql("ALTER TABLE users ALTER COLUMN has_password DROP DEFAULT;");
+
             migrationBuilder.CreateIndex(
                 name: "ix_users_google_subject",
                 table: "users",

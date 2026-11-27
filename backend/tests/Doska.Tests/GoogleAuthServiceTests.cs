@@ -74,7 +74,9 @@ public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLi
         Assert.Equal(user.Id, authenticated.Id);
         Assert.Equal("google-subject-auto", stored.GoogleSubject);
         Assert.True(stored.IsEmailConfirmed);
-        Assert.True(stored.HasPassword);
+        // При автоматической привязке Google прежний пароль инвалидируется,
+        // чтобы исключить pre-hijacking атаку.
+        Assert.False(stored.HasPassword);
         Assert.Equal(1, await CountUsersAsync(email, ct));
     }
 

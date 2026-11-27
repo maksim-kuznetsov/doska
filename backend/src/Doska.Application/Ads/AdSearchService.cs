@@ -70,6 +70,14 @@ public sealed class AdSearchService(IAppDbContext db)
             ? Math.Min(query.PageSize, MaxPageSize)
             : DefaultPageSize;
 
+        var offset = (long)(page - 1) * pageSize;
+        if (offset > int.MaxValue)
+        {
+            throw new ServiceException(
+                ServiceErrorKind.Validation,
+                "Запрошенная страница слишком велика.");
+        }
+
         var ads = db.Ads.Where(ad =>
             ad.Status == AdStatus.Active
             && ad.Author!.BlockedAt == null);
@@ -122,7 +130,7 @@ public sealed class AdSearchService(IAppDbContext db)
         };
 
         var items = await ordered
-            .Skip((page - 1) * pageSize)
+            .Skip((int)offset)
             .Take(pageSize)
             .Select(ad => new AdCard(
                 ad.Id,

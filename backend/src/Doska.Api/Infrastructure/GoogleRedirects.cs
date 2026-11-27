@@ -66,8 +66,9 @@ public static class GoogleRedirects
     /// <summary>Собирает адрес с query-параметрами ошибки Google-входа.</summary>
     public static string ErrorPath(string path, string reason)
     {
-        var builder = new StringBuilder(SafeLocalPath(path));
-        builder.Append(path.Contains('?') ? '&' : '?');
+        var safePath = SafeLocalPath(path);
+        var builder = new StringBuilder(safePath);
+        builder.Append(safePath.Contains('?') ? '&' : '?');
         builder.Append("google=error&reason=");
         builder.Append(Uri.EscapeDataString(reason));
         return builder.ToString();

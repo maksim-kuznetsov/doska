@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Doska.Api.Background;
@@ -68,8 +69,32 @@ if (!builder.Environment.IsDevelopment())
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-        options.KnownIPNetworks.Clear();
-        options.KnownProxies.Clear();
+        // Цепочка Caddy → nginx → API: два прокси добавляют заголовки.
+        options.ForwardLimit = 2;
+
+        // Доверяем только прокси-сетям, а не любому клиенту. По умолчанию —
+        // приватные сети Docker; список можно переопределить настройкой.
+        var configured = builder.Configuration
+            .GetSection("ForwardedHeaders:KnownNetworks")
+            .Get<string[]>();
+
+        if (configured is { Length: > 0 })
+        {
+            options.KnownIPNetworks.Clear();
+            foreach (var cidr in configured)
+            {
+                if (System.Net.IPNetwork.TryParse(cidr, out var network))
+                {
+                    options.KnownIPNetworks.Add(network);
+                }
+            }
+        }
+        else
+        {
+            options.KnownIPNetworks.Add(new System.Net.IPNetwork(IPAddress.Parse("10.0.0.0"), 8));
+            options.KnownIPNetworks.Add(new System.Net.IPNetwork(IPAddress.Parse("172.16.0.0"), 12));
+            options.KnownIPNetworks.Add(new System.Net.IPNetwork(IPAddress.Parse("192.168.0.0"), 16));
+        }
     });
 }
 

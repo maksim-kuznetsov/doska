@@ -89,6 +89,8 @@ public class Ad : Entity
         DateTimeOffset now)
         : base(now)
     {
+        ValidatePrice(price);
+
         AuthorId = authorId;
         CategoryId = categoryId;
         CityId = cityId;
@@ -175,7 +177,13 @@ public class Ad : Entity
     /// <param name="now">Момент завершения редактирования.</param>
     public void CompleteEdit(bool trustedAuthor, DateTimeOffset now)
     {
-        if (trustedAuthor || Status == AdStatus.OnModeration)
+        if (Status is not (AdStatus.Active or AdStatus.Archived or AdStatus.Sold))
+        {
+            throw new InvalidOperationException(
+                "Редактировать можно только активное, архивное или проданное объявление.");
+        }
+
+        if (trustedAuthor)
         {
             return;
         }
@@ -207,6 +215,8 @@ public class Ad : Entity
         bool trustedAuthor,
         DateTimeOffset now)
     {
+        ValidatePrice(price);
+
         Title = title;
         Description = description;
         Price = price;
@@ -214,7 +224,11 @@ public class Ad : Entity
         CityId = cityId;
         CategoryId = categoryId;
         CompleteEdit(trustedAuthor, now);
-        MarkUpdated(now);
+
+        if (trustedAuthor)
+        {
+            MarkUpdated(now);
+        }
     }
 
     /// <summary>Отмечает активное объявление проданным.</summary>
@@ -299,5 +313,15 @@ public class Ad : Entity
     {
         ReminderSentAt = now;
         MarkUpdated(now);
+    }
+
+    private static void ValidatePrice(decimal price)
+    {
+        if (price < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(price),
+                "Цена не может быть отрицательной.");
+        }
     }
 }

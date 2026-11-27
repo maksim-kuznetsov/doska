@@ -2,6 +2,7 @@ using Doska.Api.Contracts;
 using Doska.Api.Infrastructure;
 using Doska.Application.Abstractions;
 using Doska.Application.Ads;
+using Doska.Application.Common;
 using Doska.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -67,16 +68,39 @@ public sealed class AdsController(AdService adService, AdSearchService adSearchS
             form.CategoryId,
             form.Contacts);
 
-        var photos = form.Photos
-            .Select(file => new PhotoUpload(
-                file.OpenReadStream(),
-                file.FileName,
-                file.ContentType,
-                file.Length))
-            .ToList();
+        var photos = new List<PhotoUpload>(form.Photos.Count);
+        var streams = new List<Stream>(form.Photos.Count);
 
-        var ad = await adService.CreateAsync(User.GetRequiredUserId(), command, photos, cancellationToken);
-        return StatusCode(StatusCodes.Status201Created, AdResponse.From(ad));
+        try
+        {
+            if (form.Photos.Count is < AdService.MinPhotos or > AdService.MaxPhotos)
+            {
+                throw new ServiceException(
+                    ServiceErrorKind.Validation,
+                    $"Приложите от {AdService.MinPhotos} до {AdService.MaxPhotos} фотографий.");
+            }
+
+            foreach (var file in form.Photos)
+            {
+                var stream = file.OpenReadStream();
+                streams.Add(stream);
+                photos.Add(new PhotoUpload(
+                    stream,
+                    file.FileName,
+                    file.ContentType,
+                    file.Length));
+            }
+
+            var ad = await adService.CreateAsync(User.GetRequiredUserId(), command, photos, cancellationToken);
+            return StatusCode(StatusCodes.Status201Created, AdResponse.From(ad));
+        }
+        finally
+        {
+            foreach (var stream in streams)
+            {
+                await stream.DisposeAsync();
+            }
+        }
     }
 
     /// <summary>Возвращает объявления текущего пользователя.</summary>

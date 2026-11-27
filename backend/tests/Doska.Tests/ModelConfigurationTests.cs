@@ -152,13 +152,14 @@ public sealed class ModelConfigurationTests : IDisposable
     }
 
     [Fact]
-    public void HasPassword_has_true_default_for_existing_users()
+    public void HasPassword_is_not_store_generated()
     {
         var property = FindEntityType(typeof(User)).FindProperty(nameof(User.HasPassword));
 
         Assert.NotNull(property);
         Assert.False(property!.IsNullable);
-        Assert.Equal(true, property.GetDefaultValue());
+        Assert.Null(property.GetDefaultValueSql());
+        Assert.Equal(ValueGenerated.Never, property.ValueGenerated);
     }
 
     [Theory]

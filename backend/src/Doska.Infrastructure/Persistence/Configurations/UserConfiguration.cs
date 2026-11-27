@@ -18,7 +18,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(user => user.Email).HasMaxLength(320).IsRequired();
         builder.Property(user => user.PasswordHash).HasMaxLength(200).IsRequired();
-        builder.Property(user => user.HasPassword).HasDefaultValue(true).IsRequired();
+        builder.Property(user => user.HasPassword).IsRequired();
         builder.Property(user => user.GoogleSubject).HasMaxLength(255);
         builder.Property(user => user.DisplayName).HasMaxLength(100);
         builder.Property(user => user.Contacts).HasMaxLength(500);

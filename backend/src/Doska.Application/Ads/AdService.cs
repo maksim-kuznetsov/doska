@@ -110,24 +110,50 @@ public sealed class AdService(
             author.IsTrusted,
             now);
 
-        for (var index = 0; index < photos.Count; index++)
+        var savedPhotos = new List<StoredPhoto>();
+
+        try
         {
-            var stored = await photoStorage.SaveAsync(ad.Id, photos[index], cancellationToken);
+            for (var index = 0; index < photos.Count; index++)
+            {
+                var stored = await photoStorage.SaveAsync(ad.Id, photos[index], cancellationToken);
+                savedPhotos.Add(stored);
 
-            ad.Photos.Add(new AdPhoto(
-                ad.Id,
-                stored.FileName,
-                stored.ThumbnailFileName,
-                stored.ContentType,
-                stored.ByteSize,
-                index + 1,
-                stored.Width,
-                stored.Height,
-                now));
+                ad.Photos.Add(new AdPhoto(
+                    ad.Id,
+                    stored.FileName,
+                    stored.ThumbnailFileName,
+                    stored.ContentType,
+                    stored.ByteSize,
+                    index + 1,
+                    stored.Width,
+                    stored.Height,
+                    now));
+            }
+
+            db.Ads.Add(ad);
+            await db.SaveChangesAsync(cancellationToken);
         }
+        catch
+        {
+            foreach (var stored in savedPhotos)
+            {
+                try
+                {
+                    await photoStorage.DeleteAsync(
+                        ad.Id,
+                        stored.FileName,
+                        stored.ThumbnailFileName,
+                        CancellationToken.None);
+                }
+                catch
+                {
+                    // Очистка не должна скрывать исходное исключение.
+                }
+            }
 
-        db.Ads.Add(ad);
-        await db.SaveChangesAsync(cancellationToken);
+            throw;
+        }
 
         return ToSummary(ad);
     }
@@ -212,17 +238,28 @@ public sealed class AdService(
     {
         var (ad, _) = await LoadOwnedAsync(adId, authorId, cancellationToken);
 
-        foreach (var photo in ad.Photos)
-        {
-            await photoStorage.DeleteAsync(
-                ad.Id,
-                photo.FileName,
-                photo.ThumbnailFileName,
-                cancellationToken);
-        }
+        var files = ad.Photos
+            .Select(photo => (photo.FileName, photo.ThumbnailFileName))
+            .ToList();
 
         db.Ads.Remove(ad);
         await db.SaveChangesAsync(cancellationToken);
+
+        foreach (var (fileName, thumbnailFileName) in files)
+        {
+            try
+            {
+                await photoStorage.DeleteAsync(
+                    ad.Id,
+                    fileName,
+                    thumbnailFileName,
+                    CancellationToken.None);
+            }
+            catch
+            {
+                // Строка уже удалена; сбой удаления файла не должен ломать запрос.
+            }
+        }
     }
 
     /// <summary>Отмечает активное объявление автора проданным.</summary>
@@ -310,26 +347,34 @@ public sealed class AdService(
                 && ad.PublishedAt <= windowEnd)
             .ToListAsync(cancellationToken);
 
+        var sent = 0;
+
         foreach (var ad in expiring)
         {
             ad.MarkReminderSent(now);
 
-            if (ad.Author is not null)
+            try
             {
-                await emailSender.SendAsync(
-                    ad.Author.Email,
-                    "Объявление скоро будет снято с публикации",
-                    $"Объявление «{ad.Title}» будет снято с публикации через сутки. Продлите его, чтобы оно осталось в ленте.",
-                    cancellationToken);
+                await db.SaveChangesAsync(cancellationToken);
+
+                if (ad.Author is not null)
+                {
+                    await emailSender.SendAsync(
+                        ad.Author.Email,
+                        "Объявление скоро будет снято с публикации",
+                        $"Объявление «{ad.Title}» будет снято с публикации через сутки. Продлите его, чтобы оно осталось в ленте.",
+                        cancellationToken);
+                }
+
+                sent++;
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                // Ошибка одного адреса не должна блокировать остальные напоминания.
             }
         }
 
-        if (expiring.Count > 0)
-        {
-            await db.SaveChangesAsync(cancellationToken);
-        }
-
-        return expiring.Count;
+        return sent;
     }
 
     private async Task<User> RequireAuthorAsync(Guid authorId, CancellationToken cancellationToken)
@@ -363,7 +408,14 @@ public sealed class AdService(
                 "Можно изменять только свои объявления.");
         }
 
-        return (ad, ad.Author!);
+        if (ad.Author is null || ad.Author.IsBlocked)
+        {
+            throw new ServiceException(
+                ServiceErrorKind.Forbidden,
+                "Аккаунт заблокирован. Обратитесь к администрации.");
+        }
+
+        return (ad, ad.Author);
     }
 
     private async Task EnsureDailyLimitAsync(User author, DateTimeOffset now, CancellationToken cancellationToken)

@@ -45,9 +45,12 @@ public sealed class TrustService(IAppDbContext db, TimeProvider clock)
 
         if (grant)
         {
-            user.GrantTrust(clock.GetUtcNow());
+            if (!user.IsTrusted)
+            {
+                user.GrantTrust(clock.GetUtcNow());
+            }
         }
-        else
+        else if (user.IsTrusted)
         {
             user.RevokeTrust(clock.GetUtcNow());
         }

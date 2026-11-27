@@ -31,7 +31,7 @@ public sealed class GoogleAuthService(
         CancellationToken cancellationToken = default)
     {
         var subject = ValidateIdentity(googleSubject, email, emailVerified);
-        var normalizedEmail = email!.Trim();
+        var normalizedEmail = NormalizeEmail(email!);
 
         var linked = await db.Users.FirstOrDefaultAsync(
             candidate => candidate.GoogleSubject == subject,
@@ -43,7 +43,7 @@ public sealed class GoogleAuthService(
         }
 
         var byEmail = await db.Users.FirstOrDefaultAsync(
-            candidate => candidate.Email.ToLower() == normalizedEmail.ToLower(),
+            candidate => candidate.Email == normalizedEmail,
             cancellationToken);
 
         if (byEmail is not null)
@@ -52,12 +52,25 @@ public sealed class GoogleAuthService(
 
             if (byEmail.GoogleSubject is not null)
             {
+                if (string.Equals(byEmail.GoogleSubject, subject, StringComparison.Ordinal))
+                {
+                    return AuthenticatedUser.From(byEmail);
+                }
+
                 throw new ServiceException(
                     ServiceErrorKind.Conflict,
                     "Аккаунт уже привязан к другой Google-идентичности.");
             }
 
             var now = clock.GetUtcNow();
+
+            if (byEmail.HasPassword)
+            {
+                var passwordResetHash = passwordHasher.Hash(
+                    Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32)));
+                byEmail.RemovePassword(passwordResetHash, now);
+            }
+
             byEmail.LinkGoogle(subject, now);
 
             if (!byEmail.IsEmailConfirmed)
@@ -110,7 +123,7 @@ public sealed class GoogleAuthService(
         CancellationToken cancellationToken = default)
     {
         var subject = ValidateIdentity(googleSubject, email, emailVerified);
-        var normalizedEmail = email!.Trim();
+        var normalizedEmail = NormalizeEmail(email!);
 
         var user = await db.Users.FirstOrDefaultAsync(
             candidate => candidate.Id == userId,
@@ -180,7 +193,7 @@ public sealed class GoogleAuthService(
         var byEmail = await db.Users
             .AsNoTracking()
             .FirstOrDefaultAsync(
-                candidate => candidate.Email.ToLower() == email.ToLower(),
+                candidate => candidate.Email == email,
                 cancellationToken);
 
         if (byEmail is not null
@@ -237,4 +250,8 @@ public sealed class GoogleAuthService(
 
         return subject;
     }
+
+    /// <summary>Приводит email к единому виду: обрезка пробелов и нижний регистр.</summary>
+    private static string NormalizeEmail(string? email)
+        => (email ?? string.Empty).Trim().ToLowerInvariant();
 }

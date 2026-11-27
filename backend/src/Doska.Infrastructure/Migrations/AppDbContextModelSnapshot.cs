@@ -367,9 +367,7 @@ namespace Doska.Infrastructure.Migrations
                         .HasColumnName("google_subject");
 
                     b.Property<bool>("HasPassword")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(true)
                         .HasColumnName("has_password");
 
                     b.Property<bool>("IsEmailConfirmed")

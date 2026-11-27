@@ -85,7 +85,11 @@ public sealed class MediaMaintenanceTests : IClassFixture<ApiFactory>
                     var service = new MediaMaintenanceService(
                         db,
                         new StubHostEnvironment(AppContext.BaseDirectory),
-                        Options.Create(new MediaOptions { RootPath = root }));
+                        Options.Create(new MediaOptions
+                        {
+                            RootPath = root,
+                            CleanupGracePeriod = TimeSpan.Zero,
+                        }));
 
                     var result = await service.CleanupAsync(cancellationToken);
 

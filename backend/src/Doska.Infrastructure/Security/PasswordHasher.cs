@@ -11,8 +11,14 @@ namespace Doska.Infrastructure.Security;
 public sealed class PasswordHasher : IPasswordHasher
 {
     private const int Iterations = 100_000;
+    private const int MinIterations = 10_000;
+    private const int MaxIterations = 1_000_000;
     private const int SaltSize = 16;
+    private const int MinSaltSize = 8;
+    private const int MaxSaltSize = 64;
     private const int KeySize = 32;
+    private const int MinKeySize = 16;
+    private const int MaxKeySize = 64;
     private const char Separator = '.';
 
     /// <inheritdoc />
@@ -33,7 +39,9 @@ public sealed class PasswordHasher : IPasswordHasher
     {
         var parts = (hash ?? string.Empty).Split(Separator);
         if (parts.Length != 3
-            || !int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var iterations))
+            || !int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var iterations)
+            || iterations < MinIterations
+            || iterations > MaxIterations)
         {
             return false;
         }
@@ -46,6 +54,14 @@ public sealed class PasswordHasher : IPasswordHasher
             expectedKey = Convert.FromBase64String(parts[2]);
         }
         catch (FormatException)
+        {
+            return false;
+        }
+
+        if (salt.Length < MinSaltSize
+            || salt.Length > MaxSaltSize
+            || expectedKey.Length < MinKeySize
+            || expectedKey.Length > MaxKeySize)
         {
             return false;
         }

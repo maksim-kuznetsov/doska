@@ -11,4 +11,10 @@ public sealed class MediaOptions
 
     /// <summary>Внутренний префикс nginx для отдачи файлов через X-Accel-Redirect.</summary>
     public string InternalPrefix { get; set; } = "/media-internal";
+
+    /// <summary>
+    /// Минимальный возраст файла или каталога, после которого его можно удалять.
+    /// Защищает от гонки с загрузкой, которая ещё не сохранила строку в БД.
+    /// </summary>
+    public TimeSpan CleanupGracePeriod { get; set; } = TimeSpan.FromMinutes(10);
 }

@@ -35,9 +35,9 @@ public sealed class FileEmailSender(
         var path = Path.Combine(directory, fileName);
         var content = string.Join(
             "\r\n",
-            $"From: {options.Value.From}",
-            $"To: {email}",
-            $"Subject: {subject}",
+            $"From: {SanitizeHeader(options.Value.From)}",
+            $"To: {SanitizeHeader(email)}",
+            $"Subject: {SanitizeHeader(subject)}",
             $"Date: {DateTimeOffset.UtcNow:R}",
             "MIME-Version: 1.0",
             "Content-Type: text/plain; charset=utf-8",
@@ -59,6 +59,27 @@ public sealed class FileEmailSender(
         foreach (var symbol in email)
         {
             builder.Append(char.IsLetterOrDigit(symbol) ? symbol : '_');
+        }
+
+        return builder.ToString();
+    }
+
+    /// <summary>Удаляет управляющие символы, чтобы исключить инъекцию заголовков.</summary>
+    private static string SanitizeHeader(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        var builder = new StringBuilder(value.Length);
+
+        foreach (var symbol in value)
+        {
+            if (!char.IsControl(symbol))
+            {
+                builder.Append(symbol);
+            }
         }
 
         return builder.ToString();

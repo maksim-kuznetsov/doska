@@ -20,9 +20,6 @@ public sealed class ServiceExceptionHandler(ILogger<ServiceExceptionHandler> log
         {
             ServiceException serviceException => (StatusCodeFor(serviceException.Kind), serviceException.Message),
             ArgumentException argumentException => (StatusCodes.Status400BadRequest, argumentException.Message),
-            InvalidOperationException invalidOperationException => (
-                StatusCodes.Status409Conflict,
-                invalidOperationException.Message),
             _ => (0, string.Empty),
         };
 

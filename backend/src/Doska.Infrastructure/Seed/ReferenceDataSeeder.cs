@@ -56,8 +56,15 @@ public static class ReferenceDataSeeder
         foreach (var (sectionName, sortOrder, subsections) in sections)
         {
             var section = await db.Categories.FirstOrDefaultAsync(
-                category => category.Name == sectionName && category.ParentId == null,
+                category => category.Name == sectionName,
                 cancellationToken);
+
+            if (section is not null && section.ParentId is not null)
+            {
+                // Имя уже занято подразделом: пропускаем раздел, чтобы не нарушить
+                // глобальную уникальность названий категорий.
+                continue;
+            }
 
             if (section is null)
             {
@@ -69,7 +76,7 @@ public static class ReferenceDataSeeder
             foreach (var subsectionName in subsections)
             {
                 var exists = await db.Categories.AnyAsync(
-                    category => category.Name == subsectionName && category.ParentId == section.Id,
+                    category => category.Name == subsectionName,
                     cancellationToken);
 
                 if (!exists)

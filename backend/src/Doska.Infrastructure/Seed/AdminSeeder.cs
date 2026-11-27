@@ -28,10 +28,10 @@ public static class AdminSeeder
         TimeProvider clock,
         CancellationToken cancellationToken = default)
     {
-        var normalizedEmail = email.Trim();
+        var normalizedEmail = email.Trim().ToLowerInvariant();
         var now = clock.GetUtcNow();
         var user = await db.Users.FirstOrDefaultAsync(
-            candidate => candidate.Email.ToLower() == normalizedEmail.ToLower(),
+            candidate => candidate.Email.ToLower() == normalizedEmail,
             cancellationToken);
 
         if (user is null)

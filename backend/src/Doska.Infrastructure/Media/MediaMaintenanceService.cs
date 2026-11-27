@@ -45,6 +45,14 @@ public sealed class MediaMaintenanceService(
         var removedDirectories = 0;
         var removedFiles = 0;
 
+        var grace = options.Value.CleanupGracePeriod;
+        if (grace < TimeSpan.Zero)
+        {
+            grace = TimeSpan.Zero;
+        }
+
+        var cutoff = DateTime.UtcNow - grace;
+
         foreach (var directory in Directory.EnumerateDirectories(photosRoot))
         {
             try
@@ -53,6 +61,11 @@ public sealed class MediaMaintenanceService(
 
                 if (!Guid.TryParse(directoryName, out var adId) || !existingAds.Contains(adId))
                 {
+                    if (Directory.GetLastWriteTimeUtc(directory) > cutoff)
+                    {
+                        continue;
+                    }
+
                     Directory.Delete(directory, recursive: true);
                     removedDirectories++;
                     continue;
@@ -66,16 +79,28 @@ public sealed class MediaMaintenanceService(
                 {
                     if (!validFiles.Contains(Path.GetFileName(file)))
                     {
+                        if (File.GetLastWriteTimeUtc(file) > cutoff)
+                        {
+                            continue;
+                        }
+
                         File.Delete(file);
                         removedFiles++;
                     }
                 }
 
-                if (!Directory.EnumerateFileSystemEntries(directory).Any())
+                if (Directory.EnumerateFileSystemEntries(directory).Any())
                 {
-                    Directory.Delete(directory);
-                    removedDirectories++;
+                    continue;
                 }
+
+                if (Directory.GetLastWriteTimeUtc(directory) > cutoff)
+                {
+                    continue;
+                }
+
+                Directory.Delete(directory);
+                removedDirectories++;
             }
             catch (IOException)
             {

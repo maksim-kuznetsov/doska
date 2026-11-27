@@ -182,6 +182,20 @@ public class User : Entity
         MarkUpdated(now);
     }
 
+    /// <summary>
+    /// Сбрасывает пароль: вход по паролю становится недоступен, а вместо хеша
+    /// сохраняется заглушка. Используется при автоматической привязке Google,
+    /// чтобы прежний владелец пароля не сохранил доступ к аккаунту.
+    /// </summary>
+    /// <param name="placeholderHash">Хеш случайного значения вместо настоящего пароля.</param>
+    /// <param name="now">Момент изменения.</param>
+    public void RemovePassword(string placeholderHash, DateTimeOffset now)
+    {
+        PasswordHash = placeholderHash;
+        HasPassword = false;
+        MarkUpdated(now);
+    }
+
     /// <summary>Подтверждает адрес электронной почты.</summary>
     /// <param name="now">Момент подтверждения.</param>
     public void ConfirmEmail(DateTimeOffset now) => SetEmailConfirmed(true, now);

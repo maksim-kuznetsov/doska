@@ -55,7 +55,7 @@ public sealed class AuthService(
         string password,
         CancellationToken cancellationToken = default)
     {
-        var normalizedEmail = (email ?? string.Empty).Trim();
+        var normalizedEmail = NormalizeEmail(email);
         if (normalizedEmail.Length == 0 || !normalizedEmail.Contains('@'))
         {
             throw new ServiceException(ServiceErrorKind.Validation, "Укажите корректный email.");
@@ -64,7 +64,7 @@ public sealed class AuthService(
         ValidatePassword(password);
 
         var exists = await db.Users.AnyAsync(
-            user => user.Email.ToLower() == normalizedEmail.ToLower(),
+            candidate => candidate.Email == normalizedEmail,
             cancellationToken);
 
         if (exists)
@@ -81,7 +81,17 @@ public sealed class AuthService(
             clock.GetUtcNow());
 
         db.Users.Add(user);
-        await db.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            throw new ServiceException(
+                ServiceErrorKind.Conflict,
+                "Не удалось завершить регистрацию. Проверьте данные и попробуйте снова.");
+        }
 
         var rawToken = CreateToken(user.Id, TokenPurpose.EmailConfirmation, ConfirmationTokenLifetime);
         await db.SaveChangesAsync(cancellationToken);
@@ -96,9 +106,9 @@ public sealed class AuthService(
         string password,
         CancellationToken cancellationToken = default)
     {
-        var normalizedEmail = (email ?? string.Empty).Trim();
+        var normalizedEmail = NormalizeEmail(email);
         var user = await db.Users.FirstOrDefaultAsync(
-            candidate => candidate.Email.ToLower() == normalizedEmail.ToLower(),
+            candidate => candidate.Email == normalizedEmail,
             cancellationToken);
 
         if (user is null || !user.HasPassword || !passwordHasher.Verify(password, user.PasswordHash))
@@ -123,25 +133,44 @@ public sealed class AuthService(
         }
 
         var hash = TokenHasher.Hash(rawToken);
+        var now = clock.GetUtcNow();
         var token = await db.UserTokens
-            .Include(candidate => candidate.User)
+            .AsNoTracking()
             .FirstOrDefaultAsync(
                 candidate => candidate.TokenHash == hash && candidate.Purpose == TokenPurpose.EmailConfirmation,
                 cancellationToken);
 
-        if (token is null || token.UsedAt is not null || token.ExpiresAt <= clock.GetUtcNow())
+        if (token is null || token.UsedAt is not null || token.ExpiresAt <= now)
         {
             throw new ServiceException(ServiceErrorKind.Validation, "Ссылка подтверждения недействительна или устарела.");
         }
 
-        var now = clock.GetUtcNow();
+        var user = await db.Users.FirstOrDefaultAsync(
+            candidate => candidate.Id == token.UserId,
+            cancellationToken);
 
-        if (token.User is not null)
+        if (user is null)
         {
-            token.User.ConfirmEmail(now);
+            throw new ServiceException(ServiceErrorKind.Validation, "Ссылка подтверждения недействительна или устарела.");
         }
 
-        token.MarkUsed(now);
+        var consumed = await db.UserTokens
+            .Where(candidate =>
+                candidate.Id == token.Id
+                && candidate.UsedAt == null
+                && candidate.ExpiresAt > now)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(candidate => candidate.UsedAt, now)
+                    .SetProperty(candidate => candidate.UpdatedAt, now),
+                cancellationToken);
+
+        if (consumed != 1)
+        {
+            throw new ServiceException(ServiceErrorKind.Validation, "Ссылка подтверждения недействительна или устарела.");
+        }
+
+        user.ConfirmEmail(now);
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -153,7 +182,7 @@ public sealed class AuthService(
         string email,
         CancellationToken cancellationToken = default)
     {
-        var normalizedEmail = (email ?? string.Empty).Trim();
+        var normalizedEmail = NormalizeEmail(email);
 
         if (normalizedEmail.Length == 0)
         {
@@ -161,7 +190,7 @@ public sealed class AuthService(
         }
 
         var user = await db.Users.FirstOrDefaultAsync(
-            candidate => candidate.Email.ToLower() == normalizedEmail.ToLower(),
+            candidate => candidate.Email == normalizedEmail,
             cancellationToken);
 
         if (user is null || user.IsBlocked || user.IsEmailConfirmed)
@@ -196,7 +225,7 @@ public sealed class AuthService(
         string email,
         CancellationToken cancellationToken = default)
     {
-        var normalizedEmail = (email ?? string.Empty).Trim();
+        var normalizedEmail = NormalizeEmail(email);
 
         if (normalizedEmail.Length == 0)
         {
@@ -204,7 +233,7 @@ public sealed class AuthService(
         }
 
         var user = await db.Users.FirstOrDefaultAsync(
-            candidate => candidate.Email.ToLower() == normalizedEmail.ToLower(),
+            candidate => candidate.Email == normalizedEmail,
             cancellationToken);
 
         if (user is null || user.IsBlocked)
@@ -252,27 +281,50 @@ public sealed class AuthService(
         ValidatePassword(password);
 
         var hash = TokenHasher.Hash(rawToken);
+        var now = clock.GetUtcNow();
         var token = await db.UserTokens
-            .Include(candidate => candidate.User)
+            .AsNoTracking()
             .FirstOrDefaultAsync(
                 candidate => candidate.TokenHash == hash && candidate.Purpose == TokenPurpose.PasswordReset,
                 cancellationToken);
 
-        if (token is null || token.UsedAt is not null || token.ExpiresAt <= clock.GetUtcNow())
+        if (token is null || token.UsedAt is not null || token.ExpiresAt <= now)
         {
             throw new ServiceException(
                 ServiceErrorKind.Validation,
                 "Ссылка сброса недействительна или устарела. Запросите новую.");
         }
 
-        var now = clock.GetUtcNow();
+        var user = await db.Users.FirstOrDefaultAsync(
+            candidate => candidate.Id == token.UserId,
+            cancellationToken);
 
-        if (token.User is not null)
+        if (user is null)
         {
-            token.User.SetPassword(passwordHasher.Hash(password), now);
+            throw new ServiceException(
+                ServiceErrorKind.Validation,
+                "Ссылка сброса недействительна или устарела. Запросите новую.");
         }
 
-        token.MarkUsed(now);
+        var consumed = await db.UserTokens
+            .Where(candidate =>
+                candidate.Id == token.Id
+                && candidate.UsedAt == null
+                && candidate.ExpiresAt > now)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(candidate => candidate.UsedAt, now)
+                    .SetProperty(candidate => candidate.UpdatedAt, now),
+                cancellationToken);
+
+        if (consumed != 1)
+        {
+            throw new ServiceException(
+                ServiceErrorKind.Validation,
+                "Ссылка сброса недействительна или устарела. Запросите новую.");
+        }
+
+        user.SetPassword(passwordHasher.Hash(password), now);
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -336,4 +388,8 @@ public sealed class AuthService(
             throw new ServiceException(ServiceErrorKind.Validation, "Пароль не должен состоять только из цифр.");
         }
     }
+
+    /// <summary>Приводит email к единому виду: обрезка пробелов и нижний регистр.</summary>
+    private static string NormalizeEmail(string? email)
+        => (email ?? string.Empty).Trim().ToLowerInvariant();
 }

@@ -17,6 +17,8 @@ public sealed class LocalAdPhotoStorage(
 {
     private const int ThumbnailSize = 400;
     private const int ThumbnailQuality = 80;
+    private const long MaxUploadBytes = 5 * 1024 * 1024;
+    private const int MaxDimension = 8000;
 
     /// <inheritdoc />
     public async Task<StoredPhoto> SaveAsync(
@@ -33,6 +35,13 @@ public sealed class LocalAdPhotoStorage(
         var originalPath = Path.Combine(directory, fileName);
         var thumbnailPath = Path.Combine(directory, thumbnailFileName);
 
+        if (upload.Length <= 0 || upload.Length > MaxUploadBytes)
+        {
+            throw new ServiceException(
+                ServiceErrorKind.Validation,
+                "Размер фотографии не должен превышать 5 МБ.");
+        }
+
         await using var buffer = new MemoryStream();
         await upload.Content.CopyToAsync(buffer, cancellationToken);
         var bytes = buffer.ToArray();
@@ -41,8 +50,27 @@ public sealed class LocalAdPhotoStorage(
 
         try
         {
-            bitmap = SKBitmap.Decode(bytes)
+            using var data = SKData.CreateCopy(bytes);
+            using var codec = SKCodec.Create(data)
                 ?? throw new InvalidOperationException("Формат изображения не распознан.");
+
+            var info = codec.Info;
+            if (info.Width <= 0
+                || info.Height <= 0
+                || info.Width > MaxDimension
+                || info.Height > MaxDimension)
+            {
+                throw new ServiceException(
+                    ServiceErrorKind.Validation,
+                    "Изображение слишком большое.");
+            }
+
+            bitmap = SKBitmap.Decode(codec)
+                ?? throw new InvalidOperationException("Формат изображения не распознан.");
+        }
+        catch (ServiceException)
+        {
+            throw;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
