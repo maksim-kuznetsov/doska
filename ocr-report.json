@@ -1,0 +1,1999 @@
+
+─── Doska.Api/Background/AdArchiveBackgroundService.cs:24-25 ───
+[bug · medium] The configured interval is used without validation. If `Ads:ArchiveIntervalMinutes`
+is set to `0`, `Task.Delay(TimeSpan.Zero)` returns immediately and the loop spins without pausing,
+burning a CPU core and hammering the database/mail sender. If it is negative, `TimeSpan.FromMinutes`
+produces a negative delay and `Task.Delay` throws `ArgumentOutOfRangeException`; that call is
+outside the try/catch in `RunOnceAsync`, so the exception escapes `ExecuteAsync` and (on .NET 6+)
+faults the whole host. Validate the value and fall back to the default.
+
+-         var interval = TimeSpan.FromMinutes(
+-             configuration.GetValue("Ads:ArchiveIntervalMinutes", 60));
++         var intervalMinutes = configuration.GetValue("Ads:ArchiveIntervalMinutes", 60);
++         if (intervalMinutes <= 0)
++         {
++             logger.LogWarning(
++                 "Некорректный интервал обслуживания объявлений ({Interval} мин.), используется значение по умолчанию 60.",
++                 intervalMinutes);
++             intervalMinutes = 60;
++         }
++ 
++         var interval = TimeSpan.FromMinutes(intervalMinutes);
+
+
+─── Doska.Api/Contracts/CategoryContracts.cs:6-6 ───
+[bug · low] `Name` is declared non-nullable, but these records are bound from a JSON body by
+`[FromBody]`/System.Text.Json, which happily supplies `null` when the property is omitted (`"{}"` or
+`{"name": null}`). The current `CategoryService.NormalizeAvailableNameAsync` masks this with `(name
+?? string.Empty)`, so the contract's annotation is inaccurate and any future direct use (e.g.
+`request.Name.Trim()`) becomes a reachable NRE. Same applies to `CreateSubsectionRequest` and
+`UpdateCategoryRequest`. Declare `string?` (or add `[Required]`/validation) so the nullability
+contract matches reality.
+
+- public sealed record CreateSectionRequest(string Name, int SortOrder);
++ public sealed record CreateSectionRequest(string? Name, int SortOrder);
+
+
+─── Doska.Api/Contracts/AdSearchContracts.cs:27-28 ───
+[bug · medium] `Page`/`PageSize` are bound from the query string without any upper bound. The value
+flows into `Skip((page - 1) * pageSize)` (AdSearchService.SearchAsync); with a large `page` (e.g.
+`?page=2147483647`) the multiplication overflows `int` and becomes negative, so `Skip` receives a
+negative count and the request fails with a 500 instead of an empty page / 400. Constrain the bound
+values, e.g. `[Range(1, 1_000_000)] public int? Page { get; set; }` and `[Range(1, 50)] public int?
+PageSize { get; set; }`, or clamp them before the pagination arithmetic.
+
+
+
+─── Doska.Api/Contracts/AdSearchContracts.cs:57-59 ───
+[bug · low] Only `null` is handled here; an empty/whitespace `ThumbnailFileName` (e.g. a blank value
+left in the DB) produces the dangling URL `/api/media/photos/{id}/`, which the client will try to
+load. Use `string.IsNullOrWhiteSpace(card.ThumbnailFileName)` instead.
+
+-             card.ThumbnailFileName is null
++             string.IsNullOrWhiteSpace(card.ThumbnailFileName)
+                  ? null
+                  : MediaUrls.Photo(card.Id, card.ThumbnailFileName));
+
+
+─── Doska.Api/Contracts/AdContracts.cs:15-16 ───
+[bug · medium] `Price` is a non-nullable `decimal`, so when the client omits the field (multipart
+field missing, or a JSON body for `UpdateAdRequest` without `price`) the value silently defaults to
+`0` instead of failing validation. Since `0` is a legitimate price (`ValidateCommand` only rejects
+`< 0`), a typo/missing field produces a free ad, and for `UpdateAdRequest` it silently overwrites
+the stored price with `0`. Consider making the bound type nullable (`decimal?`) or adding a
+required/range validation so a missing value is rejected with 400.
+
+      /// <summary>Цена в рублях.</summary>
+-     public decimal Price { get; set; }
++     [Required]
++     [Range(typeof(decimal), "0", "9999999999.99")]
++     public decimal? Price { get; set; }
+
+
+─── Doska.Api/Contracts/AuthContracts.cs:9-9 ───
+[bug · medium] `Password` is declared non-nullable, but System.Text.Json model binding will pass
+`null` when the field is omitted from the JSON body (`{"email":"a@b.c"}`). `AuthService.LoginAsync`
+forwards it to `IPasswordHasher.Verify`, which calls `Rfc2898DeriveBytes.Pbkdf2(null, ...)` and
+throws `ArgumentNullException`, so this unauthenticated endpoint returns HTTP 500 instead of 400/401
+for malformed input. Enforce non-null/empty at the contract boundary (e.g. `[property: Required]`)
+or make the DTO tolerant of null and reject it explicitly before calling the hasher.
+
+- public sealed record LoginRequest(string Email, string Password);
++ public sealed record LoginRequest(
++     [property: Required(AllowEmptyStrings = false)] string Email,
++     [property: Required(AllowEmptyStrings = false)] string Password);
+
+
+─── Doska.Api/Contracts/AuthContracts.cs:6-6 ───
+[security · low] Positional records generate a `ToString()` that prints every parameter, so
+`RegisterRequest`, `LoginRequest`, `ResetPasswordRequest` (password) and `ConfirmEmailRequest`
+(one-time token) will expose secrets in plaintext whenever the object is logged, included in a
+structured log scope, or interpolated into an exception message. Consider overriding `ToString()` to
+redact `Password`/`Token`, or converting these credential-bearing types to classes whose `ToString`
+is safe by default.
+
+
+
+─── Doska.Api/Controllers/HealthController.cs:22-22 ───
+[security · low] The health endpoint is anonymous and returns the hosting environment name
+(`Development`/`Staging`/`Production`) plus the assembly version. That hands an unauthenticated
+caller internal deployment details (which environment is exposed, which build is running) that make
+targeted attacks easier, while probes only need a 200 with a coarse status. Consider returning a
+static "ok" payload (or gating the detailed payload behind a non-public path / moderator policy),
+e.g. `return Ok(new HealthResponse("ok"));`.
+
+
+
+─── Doska.Api/Controllers/AdsController.cs:70-79 ───
+[bug · high] Resource leak: the streams returned by `IFormFile.OpenReadStream()` are owned by this
+action, but nothing closes them. `AdService.CreateAsync`/`LocalAdPhotoStorage.SaveAsync` only read
+from `PhotoUpload.Content` and never dispose it, so every successful request leaks all upload
+streams (request-body buffers/handles). Worse, the streams are opened for *all* files up front,
+before the service's `ValidatePhotos` runs, so a rejected request (wrong count > 5, unsupported
+content type, unconfirmed email, rate/limit exceeded) leaks every opened stream. Additionally, since
+the number of uploaded files is not bounded here, `OpenReadStream` is called for every part the
+multipart parser accepted before the count check happens.
+
+Wrap the call in `try/finally` and dispose each `PhotoUpload.Content`, and ideally validate the
+photo count before opening any stream.
+
+          var photos = form.Photos
+              .Select(file => new PhotoUpload(
+                  file.OpenReadStream(),
+                  file.FileName,
+                  file.ContentType,
+                  file.Length))
+              .ToList();
+  
++         try
++         {
+-         var ad = await adService.CreateAsync(User.GetRequiredUserId(), command, photos, cancellationToken);
++             var ad = await adService.CreateAsync(User.GetRequiredUserId(), command, photos, cancellationToken);
+-         return StatusCode(StatusCodes.Status201Created, AdResponse.From(ad));
++             return StatusCode(StatusCodes.Status201Created, AdResponse.From(ad));
++         }
++         finally
++         {
++             foreach (var photo in photos)
++             {
++                 await photo.Content.DisposeAsync();
++             }
++         }
+
+
+─── Doska.Api/Controllers/AdminUsersController.cs:51-52 ───
+[bug · medium] `DisplayName`/`Contacts` are passed to `UserService.UpdateAsync` without any
+length/format validation. `UpdateAdminUserRequest` has no data annotations and the service/domain
+`UpdateProfile` only trims the values, while the persisted columns are limited to 100 and 500
+characters (`UserConfiguration`: `HasMaxLength(100)` / `HasMaxLength(500)`). An over-long value (or
+arbitrary control characters, since the contacts are free-form) therefore reaches `SaveChangesAsync`
+and surfaces as an unhandled `DbUpdateException` → HTTP 500 instead of a 400 validation error.
+Validate the request (e.g. `[MaxLength(User.MaxDisplayNameLength)]` / `[MaxLength(500)]` on the DTO,
+or an explicit check here) so bad input is rejected before the DB call.
+
+
+
+─── Doska.Api/Controllers/AdminUsersController.cs:41-44 ───
+[security · medium] Nothing prevents an administrator from editing their own account through this
+endpoint: sending `role = "User"` or `isBlocked = true` for the caller's own id (or
+demoting/blocking the last remaining admin) succeeds, after which no administrator exists and the
+situation cannot be undone through the API. Consider rejecting self-demotion/self-block (and
+optionally the last-admin case) using the current user id from the token, e.g. after resolving `id`:
+
+```csharp
+var currentUserId = User.GetRequiredUserId();
+if (id == currentUserId &&
+    (request.IsBlocked || !string.Equals(request.Role, nameof(UserRole.Admin),
+StringComparison.OrdinalIgnoreCase)))
+{
+    throw new ServiceException(ServiceErrorKind.Validation, "Нельзя изменить роль или заблокировать
+самого себя.");
+}
+```
+
+
+
+─── Doska.Api/Controllers/AdminOutboxController.cs:24-29 ───
+[security · medium] The `Read` action passes the raw catch-all route value straight to the
+filesystem-backed `IEmailOutbox` without any validation of its own. Two consequences: (1)
+path-traversal protection depends entirely on the current implementation
+(`FileEmailOutbox.TryResolveFile`); any other/refactored implementation would silently expose the
+whole outbox directory; (2) nothing restricts the requested file to an actual queued email (`.eml`).
+`FileEmailOutbox.ReadAsync` opens any file name inside the resolved outbox folder, so if
+`Email:OutboxPath` is empty/relative (it resolves against the content root) an admin session could
+fetch e.g. `appsettings.json` and read connection strings/secrets. Validate the name in the
+controller (simple file name, `.eml` extension) instead of relying on a single layer, so the
+endpoint only ever exposes what `List` shows.
+
+-     [HttpGet("{*fileName}")]
++     [HttpGet("{fileName}")]
+      public async Task<ActionResult<OutboxMessageContentResponse>> Read(
+          string fileName,
+          CancellationToken cancellationToken)
++     {
++         // Отдаём только письма ящика: простое имя файла с расширением .eml,
++         // без сегментов пути и выхода за пределы каталога.
++         if (!fileName.EndsWith(".eml", StringComparison.OrdinalIgnoreCase)
++             || fileName != Path.GetFileName(fileName))
+-     {
++         {
++             return BadRequest();
++         }
++ 
+          var result = await outbox.ReadAsync(fileName, cancellationToken);
+
+
+─── Doska.Api/Infrastructure/ClaimsPrincipalExtensions.cs:33-35 ───
+[bug · low] `CreateSessionPrincipal` is a public factory and dereferences `user` immediately
+(`user.Id`) without a guard, and `new Claim(...)` throws `ArgumentNullException` if
+`user.Email`/`user.Role` is null. If any of these can be null (e.g. a user record without an email),
+sign-in fails with an unhandled exception instead of a controlled error. Adding an explicit guard
+makes the failure explicit and immediate.
+
+      public static ClaimsPrincipal CreateSessionPrincipal(AuthenticatedUser user)
+      {
++         ArgumentNullException.ThrowIfNull(user);
++ 
+          var claims = new List<Claim>
+
+
+─── Doska.Api/Controllers/MediaController.cs:0-0 ───
+[security · high] The file name is interpolated into `X-Accel-Redirect` without URL-encoding, so
+nginx will decode/normalize it a second time. The validation above only rejects literal path
+separators, so a double-encoded request such as `%252e%252e%252fetc%252fpasswd` produces the header
+value `.../{adId}/%2e%2e%2fetc%2fpasswd`; nginx decodes it to `../` and the internal redirect
+escapes the photos directory (a `#` or `?` in the name likewise truncates/re-targets the URI).
+Encode every segment before building the header, or better, restrict `fileName` to a strict
+allowlist (`[A-Za-z0-9._-]`) since generated photo names never need anything else.
+
+
+
+─── Doska.Api/Controllers/MediaController.cs:0-0 ───
+[bug · medium] `Path.GetFullPath` throws `ArgumentException` for a path containing a NUL character
+(`%00` in the route segment is decoded into a real `\0`) and
+`PathTooLongException`/`NotSupportedException` for other malformed or over-long values. Neither the
+`fileName` guard above nor the route constraint prevents these, so an anonymous caller can turn this
+endpoint into a 500 instead of a 404. Validate the name against a safe character set or wrap the
+path construction in a try/catch that returns `NotFound()`.
+
+
+
+─── Doska.Api/Controllers/MediaController.cs:0-0 ───
+[security · medium] The containment check is incomplete: it compares against `photosRoot` without a
+trailing directory separator, so a sibling path such as `.../media/photos-other/x.jpg` also
+satisfies `StartsWith`. It also uses `OrdinalIgnoreCase`, which is wrong for case-sensitive file
+systems (Linux) and makes the check more permissive than the actual lookup. Compare against
+`photosRoot + Path.DirectorySeparatorChar` with the platform-appropriate comparison
+(`OrdinalIgnoreCase` only on Windows).
+
+
+
+─── Doska.Api/Controllers/ModerationController.cs:16-21 ───
+[performance · medium] The moderation queue has no paging/limit: it materializes every ad in
+`OnModeration` together with its full description (`text` column) and all photos, then maps them
+into a response list. Pending ads accumulate when moderators are behind, so a single request can
+load a large amount of data into memory and serialize it, risking latency spikes / memory pressure
+(and OOM for the whole response buffer). Consider adding `page`/`pageSize` (or `take`/`after`)
+parameters and passing a limit down to `GetQueueAsync`, so the endpoint returns a bounded page.
+
+
+
+─── Doska.Api/Infrastructure/MediaUrls.cs:8-8 ───
+[security · medium] `fileName` is interpolated into a URL path segment verbatim, with no escaping
+and no validation. Any name containing URL-reserved characters (`?`, `#`, `%`, space, non-ASCII)
+produces a broken/ambiguous URL: e.g. `photo?v=1.jpg` becomes a path plus query string, `a#b.jpg`
+truncates at the fragment, so the client requests a different resource and gets a 404 (or, for `../`
+input, an unexpected URL is emitted). The consuming controller only rejects path separators via
+`Path.GetFileName`, which does not reject these characters. Escape the segment before assembling the
+URL.
+
+-         => $"/api/media/photos/{adId}/{fileName}";
++         => $"/api/media/photos/{adId}/{Uri.EscapeDataString(fileName)}";
+
+
+─── Doska.Api/Infrastructure/GoogleRedirects.cs:69-70 ───
+[bug · high] `ErrorPath` builds the query separator from the raw `path`, but the StringBuilder is
+seeded with the normalised value from `SafeLocalPath(path)`. When `SafeLocalPath` rejects the input
+and returns `"/"` while the original `path` still contains `'?'` (e.g. `"//evil.com?x=1"` or
+`"foo?bar"`), this produces `"/&google=error&reason=..."` instead of `"/?google=error&reason=..."`.
+Because there is no `'?'`, the whole `google=error&reason=...` becomes part of the path instead of a
+query string, so the error reason is silently lost. Use the same normalised value for both the base
+and the separator detection.
+
+-         var builder = new StringBuilder(SafeLocalPath(path));
+-         builder.Append(path.Contains('?') ? '&' : '?');
++         var normalizedPath = SafeLocalPath(path);
++         var builder = new StringBuilder(normalizedPath);
++         builder.Append(normalizedPath.Contains('?') ? '&' : '?');
+
+
+─── Doska.Api/Infrastructure/ServiceExceptionHandler.cs:23-25 ───
+[bug · high] Mapping every `InvalidOperationException` to 409 Conflict is unsafe: this type is the
+standard signal for *internal* bugs and infrastructure failures (e.g. `Enumerable.Single`/`First` on
+an empty sequence, `ObjectDisposedException`, many EF Core/LINQ errors). Such failures will be
+reported to the client as a successful-ish client error (409) instead of 500, hiding real defects
+and returning internal implementation details in the body. Only a dedicated domain/conflict
+exception (e.g. a `ServiceException(ServiceErrorKind.Conflict, ...)`) should map to 409; unexpected
+`InvalidOperationException` should fall through to the default 500 handling.
+
+
+
+─── Doska.Api/Infrastructure/ServiceExceptionHandler.cs:22-22 ───
+[security · medium] `ArgumentException.Message` is placed verbatim into the HTTP response. That
+message is developer-oriented (it embeds the parameter name and often the offending value) and
+`ArgumentException` is also thrown by framework/library code for programming errors, so internal
+details can leak to untrusted callers. Return a generic title for this branch and keep the exception
+details in the log only.
+
+-             ArgumentException argumentException => (StatusCodes.Status400BadRequest, argumentException.Message),
++             ArgumentException => (StatusCodes.Status400BadRequest, "Некорректный запрос."),
+
+
+─── Doska.Api/Infrastructure/ServiceExceptionHandler.cs:57-58 ───
+[bug · medium] The fallback arm silently converts any not-yet-mapped (or invalid-cast)
+`ServiceErrorKind` value into 409 Conflict. If a new kind such as `Unprocessable` or `RateLimited`
+is added later and this switch is not updated, clients will silently receive the wrong status with
+no signal. The default should be 500 (and ideally log an error indicating an unmapped enum value) so
+the mistake is visible instead of being masked as a conflict.
+
+-         _ => StatusCodes.Status409Conflict,
++         _ => StatusCodes.Status500InternalServerError,
+      };
+
+
+─── Doska.Api/Infrastructure/ServiceExceptionHandler.cs:41-42 ───
+[maintainability · low] Per the Problem Details contract `Title` should be a stable, human-readable
+summary of the problem type; it should not change between occurrences of the same problem. Here a
+per-request message (which can also be user/validation specific) is put into `Title`, so clients
+that key off the title get an unstable value. Prefer a fixed title per status code and expose the
+message in `Detail` (optionally adding a `Type`/extension member for machine-readable codes).
+
+                  Status = statusCode,
+                  Title = title,
++                 Detail = detail,
+
+
+─── Doska.Application/Abstractions/IAdPhotoStorage.cs:4-4 ───
+[maintainability · medium] PhotoUpload.Content is an IDisposable Stream, but the contract never
+states who owns/disposes it. The default implementation (LocalAdPhotoStorage.SaveAsync) copies the
+stream and does not dispose it, so ownership implicitly falls on the caller — a caller that assumes
+the storage disposes it leaks the upload stream, while one that disposes and future implementations
+that also dispose risk double-dispose. Document the ownership rule explicitly on the record so local
+and S3 implementations behave consistently.
+
++ /// <remarks>Владелец <paramref name="Content"/> — вызывающий код; реализация хранилища не должна освобождать поток.</remarks>
+  public sealed record PhotoUpload(Stream Content, string FileName, string ContentType, long Length);
+
+
+─── Doska.Application/Abstractions/IAdPhotoStorage.cs:4-4 ───
+[security · medium] Length is a caller-supplied value that the storage implementation ignores
+(LocalAdPhotoStorage uses the actual bytes.Length of the streamed content). It can therefore diverge
+from the real content size, and if callers rely on it for upload-size limits, a small Length
+combined with a larger stream bypasses the limit. Either remove Length or document that it is
+advisory and that implementations must enforce size limits against the actually read data.
+
+
+
+─── Doska.Api/Infrastructure/ProductionSettings.cs:37-39 ───
+[bug · low] `emailMode` is compared raw, without trimming. `Program.cs` obtains it straight from
+configuration, so a value coming from an env var / secret file with an accidental trailing space
+(`Email:Mode=File `) makes both comparisons below fail and the app aborts in Production with the
+confusing "допустимы Email:Mode=Smtp ... или Email:Mode=File" message, even though the mode is
+semantically valid. Normalize the value once (Trim + ignore case) and use the normalized variable in
+all three comparisons.
+
+-         if (string.Equals(emailMode, EmailModes.File, StringComparison.OrdinalIgnoreCase))
++         var mode = emailMode?.Trim();
++ 
++         if (string.Equals(mode, EmailModes.File, StringComparison.OrdinalIgnoreCase))
+          {
+              var outboxPath = configuration["Email:OutboxPath"];
+
+
+─── Doska.Api/Infrastructure/ProductionSettings.cs:57-61 ───
+[bug · medium] The SMTP branch only verifies `Email:Host`, while both exception texts tell the
+operator to configure `Email:Host`, `Email:Port` and `Email:From`. `EmailOptions.From` defaults to
+`no-reply@doska.local` and `Port` binds without validation, so a Production deployment missing
+`Email:From` (or with a non-numeric/zero `Email:Port`) starts successfully and only fails later when
+the SMTP provider rejects the sender or the options binding throws on first send. Validate
+`Email:From` (non-empty, contains '@') and `Email:Port` (1..65535) here as well, or drop them from
+the message.
+
+
+
+─── Doska.Api/Infrastructure/GooglePublicHostMiddleware.cs:27-28 ───
+[bug · medium] `baseUri.Authority` keeps only host:port and silently drops any path component of the
+configured public URL, and `new HostString(string)` does no validation of that hand-built value
+(unlike `HostString.FromUriComponent`). Since this value is serialized into `redirect_uri` that must
+match Google exactly, a config such as `App__PublicBaseUrl=https://example.com/doska` (which still
+works for email links because they concatenate onto `BaseUrl`) yields a mismatching `redirect_uri`
+with no diagnostic. Suggest building the host with the framework helper and rejecting/logging a
+public URL that contains a path prefix instead of dropping it.
+
+                      context.Request.Scheme = baseUri.Scheme;
+-                     context.Request.Host = new HostString(baseUri.Authority);
++                     context.Request.Host = HostString.FromUriComponent(baseUri);
+
+
+─── Doska.Api/Infrastructure/GooglePublicHostMiddleware.cs:24-25 ───
+[maintainability · low] When `App:PublicBaseUrl` is empty, not an absolute URI, or uses a
+non-http(s) scheme, the middleware silently skips the rewrite, so the request keeps the
+proxy-provided Host — exactly the situation that produces Google's `redirect_uri_mismatch`, with no
+server-side hint about the cause. Consider logging a warning (e.g. once, through an `ILogger`
+obtained from `app.ApplicationServices`) in the failure branch so misconfiguration is diagnosable.
+Note this middleware sits before `UseExceptionHandler`, so anything thrown here would surface as a
+bare 500.
+
+
+
+─── Doska.Application/Abstractions/IEmailOutbox.cs:37-38 ───
+[maintainability · low] The status enum has no way to represent a read failure for a file that
+exists but cannot be read (locked file, permission denied, I/O error, etc.). Concrete
+implementations are therefore forced to crowbar such failures into `NotFound` — e.g.
+`FileEmailOutbox.ReadAsync`/`DescribeAsync` map `IOException`/`UnauthorizedAccessException` to
+`EmailOutboxReadResult.NotFound()` — so callers/UI will display "message not found" instead of a
+real error. Consider adding a distinct failure status so the contract can express this case.
+
+      /// <summary>Файл письма не найден.</summary>
+      NotFound,
++ 
++     /// <summary>Файл существует, но прочитать его не удалось (нет прав, файл занят и т. п.).</summary>
++     Unreadable,
+
+
+─── Doska.Application/Accounts/UserService.cs:45-45 ───
+[bug · low] `(normalizedPage - 1) * normalizedPageSize` is computed in `int`, so a large `page`
+query value (e.g. 21474837 with the default size) overflows and yields a negative OFFSET, which EF
+Core/PostgreSQL rejects with an exception instead of returning an empty page. Compute the offset in
+`long` (or clamp `page`).
+
+-             .Skip((normalizedPage - 1) * normalizedPageSize)
++             .Skip((int)Math.Min((long)(normalizedPage - 1) * normalizedPageSize, int.MaxValue))
+
+
+─── Doska.Application/Accounts/UserService.cs:127-128 ───
+[bug · medium] The admin update path never validates the length of `displayName`/`contacts`, while
+the persistence layer enforces `DisplayName` ≤ 100 and `Contacts` ≤ 500 (`UserConfiguration`) and
+the user-facing flow validates them explicitly (`ProfileService.UpdateAsync`). An over-long value
+reaches `SaveChangesAsync` and fails with a `DbUpdateException` (Npgsql string truncation),
+surfacing as a 500 instead of a validation error. Validate the normalized values here (reusing
+`User.MaxDisplayNameLength` / `ProfileService.MaxContactsLength`) before persisting.
+
+          var normalizedDisplayName = Normalize(displayName);
+          var normalizedContacts = Normalize(contacts);
++ 
++         if (normalizedDisplayName is { Length: > User.MaxDisplayNameLength })
++         {
++             throw new ServiceException(
++                 ServiceErrorKind.Validation,
++                 $"Отображаемое имя не длиннее {User.MaxDisplayNameLength} символов.");
++         }
++ 
++         if (normalizedContacts is { Length: > ProfileService.MaxContactsLength })
++         {
++             throw new ServiceException(
++                 ServiceErrorKind.Validation,
++                 $"Контакты не длиннее {ProfileService.MaxContactsLength} символов.");
++         }
+
+
+─── Doska.Application/Ads/CatalogService.cs:31-32 ───
+[bug · medium] `GetSubsectionsAsync` filters only on the subsection's own `IsActive` and ignores the
+state of its parent section, while `GetSectionsAsync` below returns only subsections of active
+sections. Because both results feed the same public catalog endpoints (`/api/catalog/categories` and
+`/api/catalog/sections`), deactivating a section hides it from the tree but still leaves its
+subsections selectable via the flat list, letting a user pick a subsection whose section is no
+longer offered. Add the parent activity check so both APIs agree.
+
+          => await db.Categories
+-             .Where(category => category.IsActive && category.ParentId != null)
++             .Where(category => category.IsActive && category.ParentId != null && category.Parent!.IsActive)
+
+
+─── Doska.Application/Ads/CatalogService.cs:59-60 ───
+[bug · medium] Subsections are ordered by `Name` only, so the `SortOrder` that administrators
+configure per subsection (`CategoryService.UpdateAsync` / `SetSortOrder`, used by the admin tree) is
+silently ignored in the buyer-facing section tree, and the order will not match the admin view.
+Order by `SortOrder` first, then `Name`, as done for sections.
+
+                  && sectionIds.Contains(category.ParentId!.Value))
+-             .OrderBy(category => category.Name)
++             .OrderBy(category => category.SortOrder)
++             .ThenBy(category => category.Name)
+
+
+─── Doska.Api/Program.cs:70-72 ───
+[security · high] Clearing both `KnownIPNetworks` and `KnownProxies` means every hop of
+`X-Forwarded-For`/`X-Forwarded-Proto` supplied by an untrusted client is honoured. Two consequences
+bite this file directly: (1) `UseRateLimiter` partitions on `context.Connection.RemoteIpAddress`, so
+a caller can rotate a spoofed `X-Forwarded-For` on every request and never hit the
+Sensitive/ConfirmationResend limits; (2) a spoofed `X-Forwarded-Proto: https` drives
+`CookieSecurePolicy.SameAsRequest`. Also, `ForwardLimit` defaults to 1 while the comment above says
+both Caddy and nginx front the API — with two appending proxies only the inner hop is consumed, so
+`RemoteIpAddress` becomes the inner proxy's address and all clients collapse into a single
+rate-limit partition. Restrict trust to the actual proxy networks (or a forwarded-header secret) and
+set `ForwardLimit` to the real number of proxy hops.
+
+          options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
++         // Caddy + nginx: consume exactly the proxy hops we control.
++         options.ForwardLimit = 2;
+          options.KnownIPNetworks.Clear();
+          options.KnownProxies.Clear();
+
+
+─── Doska.Api/Program.cs:164-165 ───
+[security · medium] `SameAsRequest` only adds the `Secure` attribute when the request is seen as
+https, which depends entirely on the forwarded-proto header. A direct plain-http request (or a
+request whose proto header is lost/mistyped by the proxy) causes the 7-day session cookie
+`doska.session` to be emitted without `Secure`, so it can be replayed over http. Prefer `Always`
+outside Development; the same applies to the `doska.google`/correlation cookies configured below.
+
+-         options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
++         options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
++             ? CookieSecurePolicy.SameAsRequest
++             : CookieSecurePolicy.Always;
+          options.ExpireTimeSpan = TimeSpan.FromDays(7);
+
+
+─── Doska.Api/Program.cs:184-190 ───
+[performance · medium] This handler runs for every authenticated request, so each request now costs
+an extra DB round-trip (the cookie already carries id/email/role). For a read-heavy API this is a
+hot-path query amplification; consider a short-lived cache for the user state (role/blocked) so
+refreshes are amortised while still taking effect quickly. Separately, only `ServiceException` is
+handled: a transient DB failure (or `OperationCanceledException` on request abort) escapes the
+cookie event and turns every authenticated request into a 500 instead of a clean reject — consider
+logging and rejecting there too.
+
+
+
+─── Doska.Api/Program.cs:82-84 ───
+[bug · medium] The key ring is persisted only in Development. In Production the default key ring
+lives in the container/user profile, so it is lost on every restart and is not shared between
+replicas — the 7-day session cookies, Google correlation cookies and antiforgery tokens become
+undecryptable after a deploy/restart or when a request lands on another instance. Configure a
+persistent (and shared, if more than one instance runs) key store in Production as well.
+
+
+
+─── Doska.Api/Program.cs:120-122 ───
+[bug · medium] `ProductionSettings.Validate` only runs its checks in Production, so outside
+Production any unrecognised value (en empty/`"SMT"`/`"Smtp "` typo) silently falls into `default`
+and installs `LoggingEmailSender`. A typo in a staging/test configuration then makes the app look
+like it sends mail while nothing is delivered. Validate the normalised mode here and throw on an
+unknown value (and keep an explicit `"log"` case).
+
+
+
+─── Doska.Api/Program.cs:380-382 ───
+[maintainability · medium] Auto-migration defaults to true and runs on every start, including every
+CLI command invocation (`init-data`, `create-admin`, `cleanup-media`). With more than one replica
+starting at the same time (rolling deploy / restart) concurrent `Database.MigrateAsync()` calls can
+race on the migrations history table and fail or deadlock, and a read-only maintenance command can
+trigger a schema change. Consider defaulting this to false in Production and running migrations as a
+separate step (or serialise them with a Postgres advisory lock).
+
+
+
+─── Doska.Application/Ads/AdSearchService.cs:124-125 ───
+[bug · high] `page` is taken straight from the request (`request.Page ?? 1` in the controller) and
+is only checked for `> 0`, so it is unbounded. `(page - 1) * pageSize` is `int` arithmetic: for a
+large value (e.g. `page = 200_000_000`, or `int.MaxValue`) the multiplication overflows unchecked to
+a negative offset, which PostgreSQL rejects (`OFFSET must not be negative`) and the public endpoint
+answers with an unhandled 500. Even without overflow, unbounded offsets make deep pagination
+expensive. Compute the offset in `long` and reject/clamp pages that exceed `int.MaxValue`.
+
++         var offset = (long)(page - 1) * pageSize;
++         if (offset > int.MaxValue)
++         {
++             // лишние страницы не запрашиваем в БД
++             return new PagedResult<AdCard>([], totalCount, page, pageSize);
++         }
++ 
+          var items = await ordered
+-             .Skip((page - 1) * pageSize)
++             .Skip((int)offset)
+
+
+─── Doska.Application/Ads/AdSearchService.cs:80-82 ───
+[performance · medium] `ad.Title.ToLower().Contains(text)` translates to `strpos(lower(title),
+@text) > 0 OR strpos(lower(description), @text) > 0` on PostgreSQL. Both expressions are
+non-sargable (function on the column + substring match), so every anonymous feed request with a
+search term scans the whole `ads` table twice, and the `lower()` calls also prevent using any plain
+btree index on `title`/`description`. Consider a case-insensitive approach that the provider can
+optimize (`EF.Functions.ILike` with an escaped pattern, or a `citext`/functional index), and ideally
+a `pg_trgm` GIN index for substring search.
+
+
+
+─── Doska.Application/Accounts/ProfileService.cs:42-45 ───
+[security · medium] Neither `UpdateAsync` nor `ChangePasswordAsync` checks `user.IsBlocked`. Every
+other user-facing scenario (`AdService.RequireAuthorAsync`, `AuthService.GetAsync`/`LoginAsync`)
+rejects blocked accounts with `ServiceErrorKind.Forbidden`, so a user blocked while holding a
+still-valid token can keep editing the profile and even change the password. Add the same guard
+after loading the user (in both methods).
+
+          var user = await db.Users.FirstOrDefaultAsync(candidate => candidate.Id == userId, cancellationToken)
+              ?? throw new ServiceException(ServiceErrorKind.Unauthorized, "Требуется вход.");
++ 
++         if (user.IsBlocked)
++         {
++             throw new ServiceException(ServiceErrorKind.Forbidden, "Аккаунт заблокирован.");
++         }
+  
+          user.UpdateProfile(displayName, contacts, clock.GetUtcNow());
+
+
+─── Doska.Application/Accounts/ProfileService.cs:64-64 ───
+[bug · medium] A wrong current password is reported as `ServiceErrorKind.Unauthorized`, which
+`ServiceExceptionHandler` maps to HTTP 401. For this endpoint the caller is already authenticated,
+so a non-matching current password is a validation error (400); returning 401 can make
+clients/proxies treat the session as expired and force a logout on a simple typo. Use
+`ServiceErrorKind.Validation` here.
+
+-             throw new ServiceException(ServiceErrorKind.Unauthorized, "Неверный текущий пароль.");
++             throw new ServiceException(ServiceErrorKind.Validation, "Неверный текущий пароль.");
+
+
+─── Doska.Application/Accounts/ProfileService.cs:19-19 ───
+[maintainability · low] The 500-char contacts limit is a magic number duplicated from
+`AdService.MaxContactsLength` (and from the `character varying(500)` column). The XML doc claims it
+matches the ad contacts limit, but nothing enforces that: if either side is changed, the two flows
+silently diverge. Expose the limit as a shared domain constant (e.g. on `User`/`Ad`) and reference
+it here instead of hardcoding.
+
+
+
+─── Doska.Application/Auth/AuthService.cs:66-68 ───
+[bug · high] Email uniqueness/lookup is not atomic and is not normalized once. Registration does a
+non-atomic check-then-insert, so concurrent requests can both pass and the second `SaveChangesAsync`
+throws `DbUpdateException`; catch the unique-constraint violation and return
+`ServiceErrorKind.Conflict`. The stored email keeps original casing while lookups compare
+`LOWER(email) = LOWER(@p)`, which cannot use the unique index and is culture-dependent. Normalize
+(trim + `ToLowerInvariant`) and persist the normalized address, then use plain equality for
+login/reset/resend lookups.
+
+-         var exists = await db.Users.AnyAsync(
+-             user => user.Email.ToLower() == normalizedEmail.ToLower(),
+-             cancellationToken);
++         var normalizedEmail = (email ?? string.Empty).Trim().ToLowerInvariant();
++         // ... store normalizedEmail on the User and let the unique index arbitrate:
++         // try { await db.SaveChangesAsync(cancellationToken); }
++         // catch (DbUpdateException) { throw new ServiceException(ServiceErrorKind.Conflict, "..."); }
+
+
+─── Doska.Application/Auth/AuthService.cs:83-87 ───
+[performance · low] `User.Id` is generated in the domain (`Entity.Id = Guid.CreateVersion7()`), so
+the first `SaveChangesAsync` is unnecessary: `CreateToken` only needs `user.Id`, which is already
+assigned. The extra round trip saves the user and then the token separately. In addition, if
+`SendConfirmationEmailAsync` throws after the commit, the caller sees a failure while the account
+and token stay persisted (the account can be recovered only via resend). Persist user+token in one
+save and decide explicitly how e-mail delivery failures should be surfaced.
+
+          db.Users.Add(user);
+-         await db.SaveChangesAsync(cancellationToken);
+- 
+          var rawToken = CreateToken(user.Id, TokenPurpose.EmailConfirmation, ConfirmationTokenLifetime);
+          await db.SaveChangesAsync(cancellationToken);
+
+
+─── Doska.Application/Auth/AuthService.cs:132-135 ───
+[bug · high] Both `ConfirmEmailAsync` and `ResetPasswordAsync` use check-then-act on token
+consumption: two concurrent requests with the same token can both read `UsedAt == null` and both
+succeed, so single-use is not enforced. Make consumption atomic (conditional `UPDATE ... WHERE
+UsedAt IS NULL AND ExpiresAt > @now`, requiring exactly one affected row, or an
+optimistic-concurrency token). Also, when `token.User is null` the methods still mark the token used
+and return success although no email was confirmed/password changed; fail with the same
+invalid/expired error instead.
+
+
+
+─── Doska.Application/Categories/CategoryService.cs:153-154 ───
+[bug · medium] `DeactivateAsync` only flips the flag on the target row, so deactivating a section
+leaves all of its subsections `IsActive == true`. The public lookup
+`CatalogService.GetSubsectionsAsync` filters only on `category.IsActive && category.ParentId !=
+null` (no parent-activity check), so subsections of a hidden section remain selectable for ad
+submission while the section itself disappears from `GetSectionsAsync` — an inconsistent state.
+`ActivateAsync` has the mirror problem: it happily activates a subsection whose parent section is
+inactive. Either cascade the flag to `Children` here (and reject activating a child of an inactive
+section), or make the catalog queries require an active parent.
+
+-         var category = await LoadAsync(id, cancellationToken);
+-         category.Deactivate(clock.GetUtcNow());
++         var category = await db.Categories
++             .Include(candidate => candidate.Children)
++             .FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken)
++             ?? throw new ServiceException(ServiceErrorKind.NotFound, "Категория не найдена.");
++ 
++         var now = clock.GetUtcNow();
++         category.Deactivate(now);
++ 
++         foreach (var child in category.Children)
++         {
++             child.Deactivate(now);
++         }
+
+
+─── Doska.Application/Categories/CategoryService.cs:219-224 ───
+[bug · medium] Check-then-act on name uniqueness: the existence query and the following
+`SaveChangesAsync` in `CreateSectionAsync`/`CreateSubsectionAsync`/`UpdateAsync` are not atomic.
+`CategoryConfiguration` does enforce a unique index on `Name`, so two concurrent admin requests can
+both pass this check and the second `SaveChangesAsync` will throw `DbUpdateException` — surfaced as
+HTTP 500 by `ServiceExceptionHandler` instead of the intended `ServiceErrorKind.Conflict` (409).
+Consider catching the unique-constraint violation on save (or mapping `DbUpdateException` with a
+uniqueness check) and rethrowing it as `ServiceException(ServiceErrorKind.Conflict, ...)`.
+
+
+
+─── Doska.Application/Categories/CategoryService.cs:176-176 ───
+[bug · low] The child/ads pre-checks and the subsequent `Remove` + `SaveChangesAsync` run in
+separate statements with no transaction or exception handling. An ad or subsection inserted between
+the check and the delete violates the `DeleteBehavior.Restrict` foreign keys and surfaces as an
+unhandled `DbUpdateException` (HTTP 500) rather than a controlled `Conflict`. Wrapping the check and
+delete in a transaction and translating a foreign-key violation into `ServiceErrorKind.Conflict`
+would make this deterministic. Also, `Include(candidate => candidate.Children)` materializes every
+child row just to test for existence; `AnyAsync(candidate => candidate.ParentId == id)` avoids
+loading them.
+
+
+
+─── Doska.Application/Ads/AdService.cs:359-364 ───
+[security · high] `LoadOwnedAsync` verifies ownership but not `Author.IsBlocked`, so `DeleteAsync`,
+`MarkSoldAsync`, `ReturnToSaleAsync` and `RenewAsync` let a blocked account mutate ads — notably
+`RenewAsync`/`ReturnToSaleAsync` can push an ad back to `Active` (and back into the public feed),
+which contradicts the blocked-account policy enforced in `CreateAsync` and `UpdateAsync`. Add the
+blocked check here (the author is already loaded) so every mutating path inherits it.
+
+          if (ad.AuthorId != authorId)
+          {
+              throw new ServiceException(
+                  ServiceErrorKind.Forbidden,
+                  "Можно изменять только свои объявления.");
++         }
++ 
++         if (ad.Author!.IsBlocked)
++         {
++             throw new ServiceException(ServiceErrorKind.Forbidden, "Аккаунт заблокирован.");
+          }
+
+
+─── Doska.Application/Ads/AdService.cs:115-115 ───
+[bug · high] Photo files are written to storage before the ad is persisted, and nothing cleans them
+up if a later photo upload or `db.SaveChangesAsync` fails (or the request is cancelled). A
+validation/DB error on the 3rd photo, or a failed insert, leaves the earlier files on disk with no
+`Ad`/`AdPhoto` row referencing them, so they can never be reached or removed — an unbounded disk
+leak. Collect the `StoredPhoto` results and delete them in a `catch` that rethrows (using
+`CancellationToken.None` so cleanup survives cancellation).
+
++         var savedPhotos = new List<StoredPhoto>();
++         try
++         {
++             for (var index = 0; index < photos.Count; index++)
++             {
+-             var stored = await photoStorage.SaveAsync(ad.Id, photos[index], cancellationToken);
++                 var stored = await photoStorage.SaveAsync(ad.Id, photos[index], cancellationToken);
++                 savedPhotos.Add(stored);
++                 // ... add AdPhoto as before
++             }
++ 
++             db.Ads.Add(ad);
++             await db.SaveChangesAsync(cancellationToken);
++         }
++         catch
++         {
++             foreach (var stored in savedPhotos)
++             {
++                 await photoStorage.DeleteAsync(ad.Id, stored.FileName, stored.ThumbnailFileName, CancellationToken.None);
++             }
++ 
++             throw;
++         }
+
+
+─── Doska.Application/Ads/AdService.cs:215-217 ───
+[bug · high] Files are deleted before the row is removed from the database. If `db.SaveChangesAsync`
+fails afterwards (or cancellation/another exception occurs while deleting the remaining photos), the
+`Ad` row stays in the database but points to thumbnails/originals that no longer exist, so the ad
+renders with broken images and can no longer be repaired. Persist the deletion first (snapshot the
+file names, `db.Ads.Remove(ad)`, `SaveChangesAsync`), then delete the files, tolerating individual
+storage failures.
+
+-         foreach (var photo in ad.Photos)
++         var files = ad.Photos
++             .Select(photo => (photo.FileName, photo.ThumbnailFileName))
++             .ToList();
++ 
++         db.Ads.Remove(ad);
++         await db.SaveChangesAsync(cancellationToken);
++ 
++         foreach (var (fileName, thumbnailFileName) in files)
+          {
+-             await photoStorage.DeleteAsync(
++             await photoStorage.DeleteAsync(ad.Id, fileName, thumbnailFileName, cancellationToken);
++         }
+
+
+─── Doska.Application/Ads/AdService.cs:377-379 ───
+[bug · medium] The limit is enforced with a check-then-insert pattern: two concurrent `CreateAsync`
+calls from the same untrusted author can both observe `submittedToday == DailyLimitForUntrusted - 1`
+and both insert, exceeding the limit. Since this is an anti-spam guard, it should be enforced
+atomically — e.g. wrap the count and insert in a transaction at `IsolationLevel.Serializable`, or
+keep an atomic per-author/day counter row updated with a conditional `UPDATE ... WHERE submitted <
+limit`. Note also that the count looks at the author's current ads, so deleting ads resets the
+quota.
+
+
+
+─── Doska.Application/Ads/AdService.cs:315-315 ───
+[bug · high] `ReminderSentAt` is only set in memory and persisted once, after all e-mails are sent.
+If any `emailSender.SendAsync` throws (or `SaveChangesAsync` fails) the loop aborts, the
+already-sent reminders are never stored, and the next run sends duplicates to those authors.
+Additionally one failing recipient prevents reminders for every remaining ad in the batch. Persist
+the flag before/independently of the send (save per ad, or save the flags first and treat e-mail
+failure separately), and catch per-ad errors so one bad address does not block the batch.
+
+
+
+─── Doska.Application/Ads/AdService.cs:469-469 ───
+[bug · medium] All author-facing operations (`CreateAsync`, `UpdateAsync`, `MarkSoldAsync`,
+`ReturnToSaleAsync`, `RenewAsync`) call `ToSummary(ad)` without `isOwn`, so the owner receives
+`IsOwn = false` for their own ad — inconsistent with `GetMineAsync`, which sets it to `true`. If the
+client uses the flag to show edit/sell/renew actions, the ad created/updated by this very call will
+be rendered as read-only. Pass `isOwn: true` from those methods (or remove the default value so the
+omission is a compile error).
+
+-     private static AdSummary ToSummary(Ad ad, bool isOwn = false)
++     private static AdSummary ToSummary(Ad ad, bool isOwn)
+
+
+─── Doska.Api/Infrastructure/GoogleAuthentication.cs:179-183 ───
+[maintainability · medium] `RemoteFailureContext.Failure` (the actual exception: state/correlation
+validation failure, token-exchange or userinfo error, etc.) is dropped here.
+`HandleRemoteFailureCore` only logs a generic `"failed"` reason, so the real cause of a broken
+Google sign-in is never recorded anywhere, and the default handler that would have rethrown it is
+suppressed. Pass the exception through to the helper and log it (e.g. `logger.LogWarning(failure,
+...)`) so the failure is diagnosable.
+
+          HandleRemoteFailureCore(
+              context.HttpContext,
+              context.Properties,
+              "failed",
+-             context.HandleResponse);
++             context.HandleResponse,
++             context.Failure);
+
+
+─── Doska.Api/Infrastructure/GoogleAuthentication.cs:165-167 ───
+[bug · low] This catch-all also swallows `OperationCanceledException` produced when
+`context.HttpContext.RequestAborted` (passed to `SignInAsync`/`LinkAsync`) is cancelled because the
+browser closed or navigated away during the Google callback. That case is normal, yet it is logged
+at Error level and a redirect is written to an aborted response, creating misleading alerts. Handle
+cancellation explicitly before the generic catch.
+
++         catch (OperationCanceledException) when (context.HttpContext.RequestAborted.IsCancellationRequested)
++         {
++             // Клиент прервал запрос: сессию и редирект не создаём.
++         }
+          catch (Exception exception)
+          {
+              logger.LogError(exception, "Не удалось завершить вход через Google.");
+
+
+─── Doska.Api/Infrastructure/GoogleAuthentication.cs:150-156 ───
+[bug · low] The session cookie is issued before the redirect target is computed and written. If
+`SafeLocalPath`/`ToAbsolute`/`Response.Redirect` throws (e.g. an invalid header value from a crafted
+return URL), the catch-all redirects the user to the error page even though the app cookie has
+already been set — the client ends up authenticated while being told the sign-in failed. Compute and
+validate `target` first, then sign in and redirect.
+
+-             await context.HttpContext.SignInAsync(
+-                 CookieAuthenticationDefaults.AuthenticationScheme,
+-                 ClaimsPrincipalExtensions.CreateSessionPrincipal(user));
+- 
+              var target = mode == LinkMode
+                  ? "/profile?google=linked"
+                  : GoogleRedirects.SafeLocalPath(Item(context.Properties, ReturnUrlItem));
++ 
++             await context.HttpContext.SignInAsync(
++                 CookieAuthenticationDefaults.AuthenticationScheme,
++                 ClaimsPrincipalExtensions.CreateSessionPrincipal(user));
+
+
+─── Doska.Application/Auth/GoogleAuthService.cs:53-53 ───
+[bug · high] Тот же subject, уже привязанный к найденному по email аккаунту, ошибочно трактуется как
+конфликт. Если параллельный запрос с тем же Google-subject успел выполнить привязку между первым
+поиском по `GoogleSubject` и поиском по email, `byEmail.GoogleSubject` будет равен `subject`, и вход
+упадёт с Conflict, хотя это тот же пользователь. `ResolveAfterConflictAsync` такую ситуацию
+обрабатывает корректно, но сюда выполнение не доходит. Перед выбросом конфликта нужно сравнить
+subject.
+
++             if (string.Equals(byEmail.GoogleSubject, subject, StringComparison.Ordinal))
++             {
++                 return AuthenticatedUser.From(byEmail);
++             }
++ 
+              if (byEmail.GoogleSubject is not null)
+
+
+─── Doska.Application/Auth/GoogleAuthService.cs:45-47 ───
+[security · high] Неявная привязка Google-идентичности к любому существующему аккаунту по email —
+без явного согласия владельца аккаунта. Атакующий может заранее зарегистрировать email жертвы с
+паролем (email при этом не подтверждён); после первого входа жертвы через Google его пароль остаётся
+действительным, то есть у атакующего сохраняется доступ к аккаунту, который теперь принадлежит
+жертве. Это классическая "pre-hijacking" атака. Стоит либо требовать явного подтверждения привязки
+(вход по паролю/письмо), либо инвалидировать существующий пароль при автоматической привязке по
+подтверждённому Google email.
+
+Дополнительно: сравнение `candidate.Email.ToLower() == normalizedEmail.ToLower()` использует
+культуро-зависимый `ToLower()`; при неинвариантной культуре сервера (например, tr-TR)
+`"I".ToLower()` даёт `ı`, и совпадение с `LOWER()` в БД может не найти существующий аккаунт.
+Надёжнее нормализовать email инвариантно (`ToLowerInvariant()`/хранить нормализованный email) — та
+же проблема есть и в `ResolveAfterConflictAsync`.
+
+
+
+─── Doska.Application/Auth/GoogleAuthService.cs:70-75 ───
+[bug · medium] `catch (DbUpdateException)` перехватывает любую ошибку сохранения (обрыв соединения,
+нарушение FK/CHECK, таймаут), а не только конфликт уникальности, и маскирует её под «не удалось
+завершить вход». Кроме того, после неудачного `SaveChangesAsync` добавленная сущность `user`
+остаётся в ChangeTracker в состоянии Added; если в этом же scoped-контексте позже произойдёт
+`SaveChangesAsync`, «проигравшая» сущность может быть вставлена, породив дубликат/непредсказуемое
+состояние. Стоит проверять, что исключение действительно вызвано нарушением уникальности, и
+снимать/отсоединять неудавшуюся сущность (`db.Entry(user).State = EntityState.Detached`) перед
+обработкой конфликта. Та же проблема в `LinkAsync`, где любое `DbUpdateException` превращается в
+Conflict.
+
+
+
+─── Doska.Application/Auth/GoogleAuthService.cs:130-132 ───
+[bug · medium] Проверка «сначала чтение, потом запись» без токена оптимистичной конкуренции. Два
+одновременных вызова `LinkAsync` для одного пользователя с разными subject пройдут все проверки (у
+`user.GoogleSubject` ещё null, `owner` для каждого свой), и оба `SaveChangesAsync` завершатся
+успешно — последний молча перезапишет привязку первого, а вызывающий код получит «успех» для уже
+неактуальной привязки. Нужен concurrency token/rowversion у `User` (или условный UPDATE с проверкой
+`GoogleSubject IS NULL`) и трактовка конфликта как Conflict.
+
+
+
+─── Doska.Domain/Entities/AdPhoto.cs:67-70 ───
+[bug · medium] The class summary documents hard invariants ("не более пяти фото с порядковыми
+номерами от 1 до 5"), and field docs say `ByteSize`/dimensions are bounded, but the public
+constructor validates none of them. A caller can create a photo with `SortOrder` 0, negative, or >5,
+negative `ByteSize`/`Width`/`Height`, or empty `FileName`/`ThumbnailFileName`/`ContentType`, and
+this invalid state gets persisted. Add guard clauses to enforce the documented range/validity (or an
+`AddPhoto` method on the aggregate should enforce the 1..5 limit).
+
++         if (sortOrder is < 1 or > 5)
++         {
++             throw new ArgumentOutOfRangeException(nameof(sortOrder), "Порядок фотографии должен быть от 1 до 5.");
++         }
++ 
++         if (byteSize <= 0)
++         {
++             throw new ArgumentOutOfRangeException(nameof(byteSize), "Размер файла должен быть положительным.");
++         }
++ 
++         if (width <= 0)
++         {
++             throw new ArgumentOutOfRangeException(nameof(width), "Ширина изображения должна быть положительной.");
++         }
++ 
++         if (height <= 0)
++         {
++             throw new ArgumentOutOfRangeException(nameof(height), "Высота изображения должна быть положительной.");
++         }
++ 
+          ByteSize = byteSize;
+          SortOrder = sortOrder;
+          Width = width;
+          Height = height;
+
+
+─── Doska.Domain/Entities/AdComplaint.cs:45-51 ───
+[bug · medium] The `Reason` parameter is stored as-is: empty/whitespace text is accepted,
+surrounding whitespace is not trimmed, and (since the column is mapped to `text` without a length
+limit) an arbitrarily large payload can be persisted. This contradicts the invariant enforced by the
+other aggregates — `Ad.Reject`/`Ad.Hide` throw `ArgumentException` for a blank string and store
+`reason.Trim()` — so an empty complaint can reach the DB and only fail later, if at all. Add a guard
+and normalization in the constructor (and document the contract).
+
+      public AdComplaint(Guid adId, Guid authorId, string reason, DateTimeOffset now)
+          : base(now)
++     {
++         if (string.IsNullOrWhiteSpace(reason))
+-     {
++         {
++             throw new ArgumentException("Текст жалобы обязателен.", nameof(reason));
++         }
++ 
+          AdId = adId;
+          AuthorId = authorId;
+-         Reason = reason;
++         Reason = reason.Trim();
+      }
+
+
+─── Doska.Domain/Entities/Category.cs:22-22 ───
+[bug · medium] Children is exposed as a mutable collection and only the child side is updated in
+SetParent, so callers can add children directly and the in-memory graph diverges from ParentId.
+Expose Children read-only and add children only through SetParent, keeping both sides in sync.
+
+
+
+─── Doska.Domain/Entities/Category.cs:151-155 ───
+[bug · medium] This invariant is checked against the in-memory `Children` collection only. When a
+section is loaded by EF Core without eager-loading `Children`, the collection is empty and the guard
+silently passes, allowing a section that actually has subsections to be turned into a subsection.
+The rule should be enforced against loaded/queried state (or at the persistence layer) rather than a
+possibly-empty navigation.
+
+
+
+─── Doska.Application/Moderation/ComplaintService.cs:146-146 ───
+[bug · high] `Ad.Hide` requires a non-blank reason and an `Active` status: it throws
+`ArgumentException` when the reason is empty and `InvalidOperationException` when the ad is not
+active (e.g. it was sold/archived/hidden after the complaint was filed). Here `hideReason ??
+string.Empty` guarantees a domain exception for a missing reason, and there is no status check, so
+these exceptions escape as unhandled errors instead of `ServiceException`. Validate the reason and
+the status before calling `Hide`.
+
+-             ad.Hide(hideReason ?? string.Empty, clock.GetUtcNow());
++             if (string.IsNullOrWhiteSpace(hideReason))
++             {
++                 throw new ServiceException(ServiceErrorKind.Validation, "Укажите причину скрытия объявления.");
++             }
++ 
++             if (ad.Status != AdStatus.Active)
++             {
++                 throw new ServiceException(ServiceErrorKind.Conflict, "Скрыть можно только активное объявление.");
++             }
++ 
++             ad.Hide(hideReason.Trim(), clock.GetUtcNow());
+
+
+─── Doska.Application/Moderation/ComplaintService.cs:157-158 ───
+[bug · medium] The complaint is only closed and persisted in a second `SaveChangesAsync`, after the
+e-mail is sent (and after the ad was already hidden and saved). If `email.SendAsync` throws, the ad
+remains hidden but the complaint stays `Open`; a moderator retrying `ResolveAsync` will then call
+`Ad.Hide` on an already-`Hidden` ad, which throws `InvalidOperationException`. Persist the ad change
+and the complaint close together (single `SaveChangesAsync`) before sending the notification, so a
+failed e-mail cannot leave the two records inconsistent.
+
+
+
+─── Doska.Application/Moderation/ComplaintService.cs:75-78 ───
+[bug · medium] This check-then-insert is not atomic: two concurrent submissions can both pass the
+`AnyAsync` check and both insert, which then violates the unique index on `(AdId, AuthorId)` and
+surfaces as an unhandled `DbUpdateException` (HTTP 500) rather than the intended
+`ServiceException(Conflict)`. Catch the unique-constraint violation from `SaveChangesAsync` and
+translate it to the `Conflict` error.
+
+
+
+─── Doska.Domain/Entities/Entity.cs:29-33 ───
+[bug · medium] The XML docs state that `CreatedAt`/`UpdatedAt` are UTC (`timestamptz`), but nothing
+here enforces that: callers can pass `DateTimeOffset.Now` (local offset) or any arbitrary offset,
+which then differs between rows and silently breaks the UTC contract relied on by
+ordering/filtering. Normalize the value once at the boundary. The same applies to `MarkUpdated`,
+which also lets `UpdatedAt` go backwards.
+
+      protected Entity(DateTimeOffset now)
+      {
+-         CreatedAt = now;
+-         UpdatedAt = now;
++         var utc = now.ToUniversalTime();
++         CreatedAt = utc;
++         UpdatedAt = utc;
+      }
+
+
+─── Doska.Domain/Entities/Entity.cs:23-25 ───
+[maintainability · medium] This constructor path leaves `CreatedAt`/`UpdatedAt` at
+`DateTimeOffset.MinValue` (0001-01-01). It is intended for EF Core materialization, but since it is
+also the implicit default for every derived type, a subclass that forgets to chain `: base(now)`
+produces a fully usable entity that persists the year-1 timestamp with no error. Consider giving the
+timestamps a sane default here (EF overwrites them from the columns on read anyway), or at least a
+`Debug.Assert`/guard so the misconfiguration is not silent.
+
+      protected Entity()
+      {
++         CreatedAt = DateTimeOffset.UtcNow;
++         UpdatedAt = CreatedAt;
+      }
+
+
+─── Doska.Application/Moderation/TrustService.cs:46-53 ───
+[bug · high] `RevokeAsync` не проверяет текущее состояние: `User.RevokeTrust` обнуляет
+`ApprovedAdsCount`, поэтому повторный DELETE `/api/users/{id}/trust` (или отзыв доверия у никогда не
+доверенного автора) уничтожает накопленный прогресс к автоматическому доверию (например, 2 из 3
+одобрений). Это расходится с `UserService.UpdateAsync`, который специально вызывает `RevokeTrust`
+только при фактическом изменении флага. Стоит применять операцию только при реальном изменении
+состояния.
+
+          if (grant)
++         {
++             if (!user.IsTrusted)
+-         {
++             {
+-             user.GrantTrust(clock.GetUtcNow());
++                 user.GrantTrust(clock.GetUtcNow());
+-         }
++             }
+-         else
++         }
++         else if (user.IsTrusted)
+          {
+              user.RevokeTrust(clock.GetUtcNow());
+          }
+
+
+─── Doska.Application/Moderation/TrustService.cs:24-25 ───
+[security · medium] `BlockAsync` не ограничивает цель блокировки. Метод используется эндпоинтом с
+политикой `ModeratorOrAdmin`, поэтому модератор может заблокировать администратора, другого
+модератора или самого себя, заблокировав всю модерацию/администрирование (self-lockout). Стоит
+отклонять блокировку привилегированных учётных записей (или требовать для этого роль Admin) и
+собственную учётную запись текущего пользователя, возвращая
+`ServiceException(ServiceErrorKind.Forbidden, ...)`.
+
+
+
+─── Doska.Domain/Entities/Ad.cs:97-99 ───
+[bug · high] Price is documented as non-negative but is not validated in either the constructor or
+UpdateDetails. Enforce the invariant in both paths. Also remove the duplicate MarkUpdated call for
+untrusted authors, since CompleteEdit already marks the entity.
+
++         if (price < 0)
++         {
++             throw new ArgumentOutOfRangeException(nameof(price), "Цена не может быть отрицательной.");
++         }
++ 
+          Price = price;
+          Contacts = contacts;
+          Status = trustedAuthor ? AdStatus.Active : AdStatus.OnModeration;
+
+
+─── Doska.Domain/Entities/Ad.cs:178-184 ───
+[bug · high] `CompleteEdit` only short-circuits when the ad is already `OnModeration`, so an
+untrusted author editing a `Hidden`, `Rejected`, `Sold` or `Archived` ad silently moves it back to
+`OnModeration` and wipes `ModerationReason`. That discards a moderator decision (e.g. an ad hidden
+for violating rules becomes visible again after review) and bypasses the state transitions guarded
+elsewhere (`MarkSold`, `Hide`, `Archive` all validate the current status). Restrict editing to
+statuses where it is legitimate (e.g. `Active`/`Archived`/`Sold`) and throw for the rest.
+
++         if (Status is not (AdStatus.Active or AdStatus.Archived or AdStatus.Sold))
++         {
++             throw new InvalidOperationException("Редактировать можно только активное, архивное или проданное объявление.");
++         }
++ 
+          if (trustedAuthor || Status == AdStatus.OnModeration)
+          {
+              return;
+          }
+  
+          Status = AdStatus.OnModeration;
+          ModerationReason = null;
+
+
+─── Doska.Domain/Entities/Ad.cs:100-100 ───
+[bug · medium] Untrusted (i.e. all not-yet-approved) ads get `PublishedAt = default`
+(`DateTimeOffset.MinValue`). Any expiry, reminder or ordering logic that looks at `PublishedAt`
+without strictly filtering on `Status == Active` will treat these ads as expired since year 1 and/or
+sort them at the bottom. The same stale value survives the untrusted branch of `ReturnToSale`, where
+the status becomes `OnModeration` while `PublishedAt` still points at the previous publication
+window. Either make `PublishedAt` nullable to express "not published yet", or reset it to `default`
+in every transition back to `OnModeration` and document that consumers must check the status first.
+
+          PublishedAt = trustedAuthor ? now : default;
+
+
+─── Doska.Domain/Entities/Ad.cs:298-302 ───
+[bug · medium] `MarkReminderSent` accepts no state and can be invoked for an ad that is
+`OnModeration`, `Rejected`, `Hidden`, `Sold` or `Archived`, writing `ReminderSentAt` and touching
+`UpdatedAt` outside any legitimate publication window. A reminder written while the ad is not active
+will then suppress the reminder for the following real publication window until some other
+transition resets the field. Validate the status (and that the publication window is actually
+running) before marking.
+
+      public void MarkReminderSent(DateTimeOffset now)
++     {
++         if (Status != AdStatus.Active)
+-     {
++         {
++             throw new InvalidOperationException("Напоминание можно отправить только по активному объявлению.");
++         }
++ 
+          ReminderSentAt = now;
+          MarkUpdated(now);
+      }
+
+
+─── Doska.Domain/Entities/Ad.cs:57-57 ───
+[maintainability · low] The documented invariant "no more than five photos" is not enforced
+anywhere: `Photos` is exposed as a mutable `ICollection<AdPhoto>` with a public getter, so callers
+can add/remove arbitrary numbers of photos (and duplicate `SortOrder` values) without going through
+a domain method. Prefer a private setter/backing list with `AddPhoto`/`RemovePhoto` methods that
+enforce the limit and ordering.
+
+
+
+─── Doska.Domain/Entities/UserToken.cs:48-51 ───
+[bug · medium] The constructor assigns its arguments without any validation, although the entity is
+the only place these invariants can be enforced (properties have private setters). An
+empty/whitespace `tokenHash` (the `= string.Empty` default makes this reachable), a hash longer than
+the 64 chars configured in `UserTokenConfiguration`, an undefined `TokenPurpose` value, or an
+already past `expiresAt` are all accepted here and only surface later as an opaque
+`DbUpdateException`/check-constraint failure. `User.NormalizeGoogleSubject` shows the project
+already guards such inputs in the domain.
+
++         if (string.IsNullOrWhiteSpace(tokenHash))
++         {
++             throw new ArgumentException("Хеш токена не может быть пустым.", nameof(tokenHash));
++         }
++ 
++         if (expiresAt <= now)
++         {
++             throw new ArgumentOutOfRangeException(nameof(expiresAt), "Срок действия токена должен быть в будущем.");
++         }
++ 
+          UserId = userId;
+          TokenHash = tokenHash;
+          Purpose = purpose;
+          ExpiresAt = expiresAt;
+
+
+─── Doska.Domain/Entities/UserToken.cs:56-60 ───
+[bug · medium] `MarkUsed` silently overwrites `UsedAt` when the token is already used (and does not
+reject an expired token), so the "one-time token" invariant declared in the class summary is not
+enforced at all — a caller that processes the same link twice will get a successful state transition
+instead of an error. `User.LinkGoogle` follows the existing project pattern of throwing
+`InvalidOperationException` when the state transition is not allowed.
+
+      public void MarkUsed(DateTimeOffset now)
++     {
++         if (UsedAt is not null)
+-     {
++         {
++             throw new InvalidOperationException("Токен уже использован.");
++         }
++ 
+          UsedAt = now;
+          MarkUpdated(now);
+      }
+
+
+─── Doska.Domain/Enums/TokenPurpose.cs:7-7 ───
+[security · low] `default(TokenPurpose)` (and any uninitialized/defaulted `Purpose` column or
+payload field) resolves to a *valid* purpose, `EmailConfirmation`. If a token entity/payload is ever
+created or deserialized without explicitly setting `Purpose`, the token silently becomes usable as
+an email-confirmation token instead of being rejected. Consider reserving `0` for an invalid/unset
+value (`None = 0`) and starting real purposes at `1`, so a missing assignment fails closed in
+purpose checks.
+
+-     EmailConfirmation = 0,
++     None = 0,
++ 
++     /// <summary>Подтверждение адреса электронной почты при регистрации.</summary>
++     EmailConfirmation = 1,
+
+
+─── Doska.Application/Locations/CityService.cs:114-114 ───
+[bug · low] The duplicate-name check is a check-then-act sequence: another request can insert the
+same name between this `AnyAsync` and the subsequent `SaveChangesAsync`. `CityConfiguration`
+declares a unique index on `Name`, so the losing request fails with `DbUpdateException`, which
+`ServiceExceptionHandler` does not map (it only handles `ServiceException`, `ArgumentException` and
+`InvalidOperationException`) and the caller therefore receives 500 instead of the intended 409
+"Город с таким названием уже существует." Suggest translating the unique-constraint violation into
+`ServiceException(ServiceErrorKind.Conflict, ...)` (e.g. catch `DbUpdateException` around
+`SaveChangesAsync` in `CreateAsync`/`RenameAsync`), so concurrent creation of the same city is
+handled deterministically.
+
+
+
+─── Doska.Application/Moderation/ModerationService.cs:88-89 ───
+[bug · medium] The decision is committed to the database *before* the author is loaded and before
+the notification is sent (same pattern in `HideAsync`). If `email.SendAsync` fails (SMTP/network
+error), the ad is already `Rejected`/`Hidden` while the caller gets an error. Any retry then fails
+the domain guard in `Ad.Reject` (`Status != OnModeration`) and is mapped to 409, so the author can
+never be notified for that decision. Commit the state change and treat the e-mail as best-effort
+(load the author before saving, catch/log a send failure) or move the notification to an outbox, so
+a mail outage cannot leave the moderation decision in an un-notifiable state.
+
+          ad.Reject(reason, clock.GetUtcNow());
++         var author = await db.Users.FirstAsync(user => user.Id == ad.AuthorId, cancellationToken);
+          await db.SaveChangesAsync(cancellationToken);
++ 
++         try
++         {
++             await email.SendAsync(
++                 author.Email,
++                 "Объявление отклонено",
++                 $"Объявление «{ad.Title}» отклонено. Причина: {ad.ModerationReason}",
++                 cancellationToken);
++         }
++         catch (Exception)
++         {
++             // Уведомление не должно отменять уже принятое решение.
++         }
+
+
+─── Doska.Application/Moderation/ModerationService.cs:34-35 ───
+[performance · low] `GetQueueAsync` materialises the whole moderation queue with no paging or upper
+bound — every pending ad, its contacts and all photo metadata are fetched and returned in a single
+response. As the backlog grows (e.g. after an outage or a spam wave) this becomes a heavy query and
+a large payload for the moderator UI. Consider a `Skip`/`Take` window (or at least a `Take(cap)`)
+ordered by `CreatedAt`.
+
+
+
+─── Doska.Application/Moderation/ModerationService.cs:48-48 ───
+[bug · low] `SubmittedAt` is populated from `CreatedAt`, which is the original creation time. Ads
+can re-enter moderation long after creation (`Ad.CompleteEdit` when a non-trusted author edits an
+active ad, and `Ad.ReturnToSale` for a sold ad), so for those the queue reports a stale "submitted"
+time and orders them by their original creation — they jump ahead of genuinely older pending ads.
+Use the resubmission timestamp (`UpdatedAt` is refreshed by `MarkUpdated` in both paths) or persist
+an explicit `SubmittedAt`.
+
+
+
+─── Doska.Infrastructure/Common/PathResolver.cs:11-11 ───
+[bug · medium] Missing input validation. `Path.IsPathRooted(null)` returns `false`, so a `null`
+value (e.g. a missing configuration key returned by `IConfiguration`) falls through to
+`Path.Combine(contentRoot, null)`, which throws a bare `ArgumentNullException` from BCL code instead
+of a meaningful error. Likewise an empty/whitespace value is treated as a relative path and resolves
+to the content root itself, so a required path setting that was accidentally left blank silently
+turns into "application directory" — a common cause of files being written next to the binary.
+Consider guarding explicitly.
+
+-         => Path.IsPathRooted(configured)
++     public static string Resolve(string configured, string contentRoot)
++     {
++         if (string.IsNullOrWhiteSpace(configured))
++             throw new ArgumentException("Path setting must not be null or empty.", nameof(configured));
++         if (string.IsNullOrWhiteSpace(contentRoot))
++             throw new ArgumentException("Content root must not be null or empty.", nameof(contentRoot));
++ 
++         return Path.IsPathRooted(configured)
++             ? Path.GetFullPath(configured)
++             : Path.GetFullPath(Path.Combine(contentRoot, configured));
++     }
+
+
+─── Doska.Infrastructure/Common/PathResolver.cs:13-13 ───
+[security · medium] The documented contract says a relative path "is counted from the content root",
+but `Path.Combine` performs no normalization: a value containing `..` segments (e.g. `../../etc`)
+produces a path that escapes the content root while still looking like a valid relative setting, and
+the result may also contain `.`/`..` leftovers that break naive string comparisons or path-based
+authorization checks. Since the resolved value is used as a file path (trust boundary), either
+normalize with `Path.GetFullPath` and verify the result stays under the content root, or document
+that traversal is intentionally allowed.
+
+-             : Path.Combine(contentRoot, configured);
++             : EnsureWithin(contentRoot, configured);
++ 
++     private static string EnsureWithin(string contentRoot, string configured)
++     {
++         var root = Path.GetFullPath(contentRoot);
++         var resolved = Path.GetFullPath(Path.Combine(root, configured));
++         var relative = Path.GetRelativePath(root, resolved);
++ 
++         if (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
++             throw new InvalidOperationException($"Path '{configured}' resolves outside of the content root.");
++ 
++         return resolved;
++     }
+
+
+─── Doska.Infrastructure/Email/ConfiguredPublicUrlProvider.cs:10-10 ───
+[bug · medium] The configured value is used as-is apart from stripping trailing slashes. If
+`App:PublicBaseUrl` is missing/empty (it defaults to `string.Empty` in `PublicUrlOptions`),
+`BaseUrl` silently becomes an empty string, so every link built from it in outgoing emails
+degenerates into a relative URL instead of failing fast at startup. Surrounding whitespace is not
+removed either (`" https://x.com/ "` -> `" https://x.com "`), which likewise produces malformed
+links. Consider normalizing/validating and failing fast on invalid configuration.
+
+-     public string BaseUrl { get; } = options.Value.PublicBaseUrl.TrimEnd('/');
++     public string BaseUrl { get; } = Resolve(options.Value.PublicBaseUrl);
++ 
++     private static string Resolve(string publicBaseUrl)
++     {
++         var normalized = publicBaseUrl.Trim().TrimEnd('/');
++         if (!Uri.TryCreate(normalized, UriKind.Absolute, out _))
++         {
++             throw new InvalidOperationException(
++                 "App:PublicBaseUrl must be configured with an absolute URL (e.g. https://doska.example.com).");
++         }
++ 
++         return normalized;
++     }
+
+
+─── Doska.Infrastructure/Email/LoggingEmailSender.cs:14-14 ───
+[security · medium] The full email body is written to the application log at Information level.
+Bodies produced by this application typically contain secrets/PII: confirmation and password-reset
+links with tokens, one-time codes, user content. Even though this sender targets dev/test, such logs
+frequently end up in files, CI output or centralized logging, which leaks those tokens. Log only the
+recipient/subject, or truncate/redact the body and lower the level to Debug.
+
+-         logger.LogInformation("Письмо для {Email}. Тема: {Subject}. Текст: {Body}", email, subject, body);
++         logger.LogDebug("Письмо для {Email}. Тема: {Subject}. Длина текста: {BodyLength}", email, subject, body.Length);
+
+
+─── Doska.Domain/Entities/User.cs:224-226 ───
+[bug · medium] `UpdateProfile` assigns `DisplayName` without enforcing the `MaxDisplayNameLength`
+invariant, while `ApplyGoogleDisplayName` explicitly rejects over-long values. Because the entity is
+documented as the owner of this invariant, an oversized name accepted here will only surface later
+as a DB write failure/truncation. Validate the normalized length here (throwing `ArgumentException`,
+consistent with how `NormalizeGoogleSubject` handles invalid input) so both entry points uphold the
+same rule.
+
+      public void UpdateProfile(string? displayName, string? contacts, DateTimeOffset now)
+      {
+-         DisplayName = Normalize(displayName);
++         var normalizedName = Normalize(displayName);
++ 
++         if (normalizedName is not null && normalizedName.Length > MaxDisplayNameLength)
++         {
++             throw new ArgumentException(
++                 $"Отображаемое имя не должно превышать {MaxDisplayNameLength} символов.",
++                 nameof(displayName));
++         }
++ 
++         DisplayName = normalizedName;
+
+
+─── Doska.Domain/Entities/User.cs:178-181 ───
+[bug · medium] `SetPassword` unconditionally sets `HasPassword = true`, so an empty/whitespace hash
+leaves the account flagged as password-enabled with an unusable credential, violating the meaning of
+`HasPassword` ("признак заданного пароля"). Guard against a missing hash before mutating state.
+
+      public void SetPassword(string passwordHash, DateTimeOffset now)
++     {
++         if (string.IsNullOrWhiteSpace(passwordHash))
+-     {
++         {
++             throw new ArgumentException("Хеш пароля не может быть пустым.", nameof(passwordHash));
++         }
++ 
+          PasswordHash = passwordHash;
+          HasPassword = true;
+
+
+─── Doska.Domain/Entities/User.cs:72-74 ───
+[security · medium] `Email` is stored verbatim, with no trimming or emptiness check. Since the
+property is documented as unique and used for login, storing values like `" user@example.com "` or
+empty strings defeats the uniqueness/login contract (especially with a case-sensitive unique index)
+and can produce duplicates or accounts that can never authenticate. Normalize/validate the email
+before assigning, mirroring the validation the entity already performs for `GoogleSubject`.
+
+-         Email = email;
++         var normalizedEmail = email?.Trim();
++ 
++         if (string.IsNullOrEmpty(normalizedEmail))
++         {
++             throw new ArgumentException("Адрес электронной почты не может быть пустым.", nameof(email));
++         }
++ 
++         Email = normalizedEmail;
+          PasswordHash = passwordHash;
+          Role = role;
+
+
+─── Doska.Infrastructure/Email/FileEmailSender.cs:39-39 ───
+[security · high] `email` (and `subject` below) is interpolated into the header block verbatim. If
+either value contains CR/LF (e.g. a subject built from user input such as a display name), the
+attacker can inject arbitrary additional headers into the generated `.eml` (`Bcc:`, `Content-Type:`,
+etc.) or corrupt the message structure. Strip control characters, at minimum `\r` and `\n`, from
+every header value before writing.
+
+-             $"To: {email}",
++             $"To: {SanitizeHeader(email)}",
+
+
+─── Doska.Infrastructure/Email/FileEmailSender.cs:40-40 ───
+[bug · medium] The subject is emitted as raw UTF-8 inside a header line, while `charset=utf-8` is
+only declared for the message body (`Content-Type` applies to the body, not headers). Per RFC 2047 a
+non-ASCII header value must be encoded as an encoded-word (`=?utf-8?B?...?=`), otherwise subjects
+containing Cyrillic/other non-ASCII characters will be shown garbled or rejected by mail clients.
+Encode the subject (and `From` display name, if non-ASCII) as an encoded-word, in addition to
+stripping CR/LF.
+
+-             $"Subject: {subject}",
++             $"Subject: {EncodeHeaderValue(subject)}",
+
+
+─── Doska.Infrastructure/Email/FileEmailSender.cs:33-33 ───
+[bug · medium] The resulting file name can exceed the filesystem limit: the fixed prefix
+(`yyyyMMdd-HHmmss` + GUID + separators + `.eml`) is already ~53 characters, and the sanitized
+address is appended untruncated. A long (but valid) address — or one containing non-ASCII characters
+that expand to 2–3 bytes in the file name — pushes the name past the 255-byte NAME_MAX, so
+`WriteAllTextAsync` fails with `PathTooLongException`/`IOException` instead of sending the mail.
+Truncate or hash the address part (e.g. keep the first 64 chars and append a short hash).
+
+
+
+─── Doska.Infrastructure/Media/LocalAdPhotoStorage.cs:104-107 ───
+[security · medium] DeleteAsync builds file system paths by combining caller-supplied
+`fileName`/`thumbnailFileName` directly with the ad directory. There is no validation that these are
+bare file names: a rooted value (e.g. `C:\...`) makes `Path.Combine` ignore the directory, and a
+value containing `..` (e.g. `../../../secret`) escapes the ad directory. If these values ever
+originate from user or database input, this becomes an arbitrary file-deletion vulnerability.
+Validate each name (e.g. reject when `Path.GetFileName(name) != name`) or verify the resolved full
+path stays under the ad directory before deleting.
+
+
+
+─── Doska.Infrastructure/Media/LocalAdPhotoStorage.cs:36-38 ───
+[security · high] The entire upload is buffered into memory and then fully decoded via
+`SKBitmap.Decode(bytes)` with no byte-size or pixel-dimension limit. A large upload or a malicious
+'decompression bomb' (tiny file, enormous intrinsic dimensions) can allocate hundreds of MB and
+exhaust process memory (DoS on the upload endpoint). Enforce a maximum size using `upload.Length`
+before reading, and reject images whose decoded `Width`/`Height` exceed a sane bound. Also consider
+streaming to the file instead of `buffer.ToArray()` to avoid duplicating the payload in memory.
+
+
+
+─── Doska.Infrastructure/Media/LocalAdPhotoStorage.cs:28-29 ───
+[maintainability · low] `Directory.CreateDirectory` runs before any try block, so if decoding fails
+or file writing throws, the created ad directory is never removed and orphan empty directories
+accumulate over time. Create the directory inside the protected region and clean it up on failure,
+or create it only immediately before the first successful write.
+
+
+
+─── Doska.Infrastructure/Media/MediaMaintenanceService.cs:54-56 ───
+[bug · high] Race with in-flight uploads: the ad ids and photo rows are snapshotted up front, then
+used to delete from disk without any freshness guard. `LocalAdPhotoStorage.SaveAsync` creates
+`photos/{adId}` and writes the original/thumbnail before the `AdPhoto` row is committed, and the ad
+id directory may exist before the `Ad` row is visible. If cleanup runs concurrently, it will
+`Directory.Delete(..., recursive: true)` a just-created directory (or delete the freshly written
+files as "unreferenced"), while the DB keeps rows pointing at those files — permanently broken
+images. Since the whole point of the service is idempotency, consider skipping entries whose last
+write time is newer than a configurable grace window (or only deleting files older than the snapshot
+time).
+
+
+
+─── Doska.Infrastructure/Media/MediaMaintenanceService.cs:48-49 ───
+[bug · medium] `cancellationToken` is only passed to the two EF queries; the potentially long
+filesystem scan/delete loop never observes it. On a large media volume the caller cannot abort a
+multi-minute cleanup (e.g. on shutdown). Add `cancellationToken.ThrowIfCancellationRequested()` at
+the start of each iteration (and ideally inside the inner file loop).
+
+          foreach (var directory in Directory.EnumerateDirectories(photosRoot))
+          {
++             cancellationToken.ThrowIfCancellationRequested();
+
+
+─── Doska.Infrastructure/Media/MediaMaintenanceService.cs:80-87 ───
+[maintainability · medium] Both catch blocks swallow the failure completely and the class has no
+`ILogger`, so a recurring problem (persistent `UnauthorizedAccessException` because of volume
+permissions, locked directory, etc.) leaves no trace anywhere — the service just silently reports
+fewer removals than expected. The failure is expected/retryable, but it still needs to be recorded;
+inject `ILogger<MediaMaintenanceService>` and log at Warning with the directory path and exception.
+
+
+
+─── Doska.Infrastructure/Persistence/AppDbContext.cs:13-13 ───
+[documentation · low] The documented migration commands reference paths that do not exist in this
+repository: projects live at the repository root
+(`Doska.Infrastructure/Doska.Infrastructure.csproj`, `Doska.Api/Doska.Api.csproj`), there is no
+`backend` directory and no `src/` prefix. Copy-pasting these commands as documented will fail, as
+will the instruction to run them from `backend`. Please correct the paths (and the working
+directory) so the snippet is actually executable.
+
+- /// <c>dotnet tool run dotnet-ef migrations add ИмяМиграции --project src/Doska.Infrastructure --startup-project src/Doska.Api --output-dir Migrations</c>,
++ /// <c>dotnet tool run dotnet-ef migrations add ИмяМиграции --project Doska.Infrastructure --startup-project Doska.Api --output-dir Migrations</c>,
+
+
+─── Doska.Infrastructure/Email/FileEmailOutbox.cs:121-121 ───
+[bug · medium] `TryResolveFile` builds `Path.GetFullPath("Path.Combine(root, fileName))` from a
+`fileName` that is user-controlled (the controller exposes it through the catch-all route
+`{*fileName}`). Malformed or over-long input (embedded NUL, path-length overflow, unsupported
+characters) makes these APIs throw `ArgumentException` / `PathTooLongException` /
+`NotSupportedException`. Because the `TryResolveFile` call sits outside the `try` in `ReadAsync`,
+such input propagates as an unhandled 500 instead of returning `InvalidName`. Wrap the path
+computation so these exceptions map to `false`.
+
+-         var candidate = Path.GetFullPath(Path.Combine(root, fileName));
++         string candidate;
++         try
++         {
++             candidate = Path.GetFullPath(Path.Combine(root, fileName));
++         }
++         catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
++         {
++             return false;
++         }
+
+
+─── Doska.Infrastructure/Email/FileEmailOutbox.cs:76-77 ───
+[performance · low] `DescribeAsync` reads the entire `.eml` file, body included, only to parse the
+header block. `ListAsync` does this for up to `MaxMessages` files on every request, so a single
+email with a large body is fully allocated and read per list call. Consider streaming only until the
+first blank line (the end of headers) instead of loading the whole file.
+
+-             var text = await File.ReadAllTextAsync(file.FullName, cancellationToken);
+-             var headers = ParseHeaders(text);
++             using var stream = new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
++             using var reader = new StreamReader(stream);
++             var headers = ParseHeaders(reader);
+
+
+─── Doska.Infrastructure/Persistence/AppDbContextFactory.cs:52-56 ───
+[maintainability · medium] Using `JsonElement.GetProperty` for `ConnectionStrings`/`Default` throws
+`KeyNotFoundException` (and `InvalidOperationException` if the root isn't an object) before the
+friendly "не заполнено ConnectionStrings:Default" message can run, so a missing key produces an
+opaque stack trace instead of the intended diagnostic. Additionally, `JsonDocument.Parse` here does
+not allow comments or trailing commas, unlike the `Microsoft.Extensions.Configuration.Json` loader
+the API itself uses, so a `appsettings.Development.json` that works at runtime can make `dotnet-ef`
+fail. Prefer `TryGetProperty` and tolerant parse options.
+
+-         using var document = JsonDocument.Parse(File.ReadAllText(settingsPath));
+-         var connectionString = document.RootElement
+-             .GetProperty("ConnectionStrings")
+-             .GetProperty("Default")
+-             .GetString();
++         using var document = JsonDocument.Parse(
++             File.ReadAllText(settingsPath),
++             new JsonDocumentOptions
++             {
++                 CommentHandling = JsonCommentHandling.Skip,
++                 AllowTrailingCommas = true,
++             });
++ 
++         var connectionString = document.RootElement.TryGetProperty("ConnectionStrings", out var connectionStrings)
++             && connectionStrings.TryGetProperty("Default", out var defaultConnection)
++                 ? defaultConnection.GetString()
++                 : null;
+
+
+─── Doska.Infrastructure/Migrations/20261126172640_AddGoogleSignIn.cs:23-25 ───
+[bug · high] Declaring a store default of `true` for `has_password` here matches
+`builder.Property(user => user.HasPassword).HasDefaultValue(true)` in `UserConfiguration`, which
+makes this column `ValueGenerated.OnAdd`. EF Core uses the CLR default (`false` for `bool`) as the
+"not set" sentinel in that situation, so an entity inserted with `HasPassword = false` (e.g.
+`User.CreateWithGoogle`) has the column omitted from the INSERT and gets `true` from the database
+default; the entity is then read back with `HasPassword = true`, and Google-only accounts are
+persisted as password accounts. Fix this in the model mapping, either by registering a sentinel that
+is not `false` (`builder.Property(user =>
+user.HasPassword).HasDefaultValue(true).HasSentinel(true)`) or by dropping the store default and
+letting the entity always supply the value. If you drop the store default, keep this migration's
+default only to backfill existing rows, or add the column with `defaultValue: false` plus an `UPDATE
+users SET has_password = true` for pre-existing rows.
+
+
+
+─── Doska.Infrastructure/Migrations/20261126172640_AddGoogleSignIn.Designer.cs:372-376 ───
+[bug · high] High risk: `HasPassword` is `ValueGeneratedOnAdd()` with `HasDefaultValue(true)`. For a
+non-nullable `bool`, EF Core treats the CLR default (`false`) as the "not set" sentinel, so when a
+Google-only account is saved with `HasPassword = false`, EF omits the column from the INSERT and
+Postgres applies the DB default `true`. The passwordless account then silently becomes `HasPassword
+= true`, which can enable password-login paths and corrupt state. The store default is only needed
+to backfill existing rows; it should not drive the runtime column mapping. Recommended: remove
+`HasDefaultValue(true)` from the property mapping in `UserConfiguration` (so EF always sends the
+explicit value) and backfill existing rows via the migration (`defaultValue: true` on the AddColumn
+only, plus dropping the default afterwards).
+
+
+
+─── Doska.Infrastructure/Migrations/20261126172640_AddGoogleSignIn.Designer.cs:386-390 ───
+[bug · medium] `PasswordHash` remains `IsRequired()` (non-nullable) while Google sign-in is being
+introduced. Accounts created purely via Google have no password, so a placeholder value must be
+persisted here. If a placeholder/empty string is used, verify that every authentication path checks
+`HasPassword` before validating the hash and never accepts an empty hash as a valid credential.
+Consider documenting the intended placeholder (e.g. a random unusable hash) so the invariant is
+explicit rather than implicit.
+
+
+
+─── Doska.Infrastructure/Migrations/20261126172640_AddGoogleSignIn.Designer.cs:409-411 ───
+[bug · low] `GoogleSubject` is nullable yet carries a unique index. This relies on Postgres'
+NULL-distinct semantics (multiple users without a Google link all store NULL, which is correct).
+Ensure the application always writes `null` — not an empty string — for users without a Google
+subject: distinct empty strings (`''`) would violate the unique constraint, while a single `''`
+would be treated as a real duplicate. Also note the `Down` migration drops this column, so no
+explicit index-drop ordering concern exists, but confirm the empty-string invariant is enforced in
+code.
+
+
+
+─── Doska.Infrastructure/Email/SmtpEmailSender.cs:17-20 ───
+[performance · medium] `SmtpClient.Timeout` is left at its default of 100 seconds. `SmtpEmailSender`
+is registered as scoped and is called on the request path (registration/confirmation flows), so an
+unresponsive or blackholed SMTP server stalls the request thread for up to 100 s per message
+whenever the caller does not pass a cancellable token. Consider exposing
+`EmailOptions.TimeoutSeconds` and setting `Timeout` (e.g. 10–30 s) so a mail outage degrades quickly
+instead of tying up request threads.
+
+          using var client = new SmtpClient(_options.Host, _options.Port)
+          {
+              EnableSsl = _options.UseStartTls,
++             Timeout = _options.TimeoutSeconds * 1000,
+          };
+
+
+─── Doska.Infrastructure/Email/SmtpEmailSender.cs:24-24 ───
+[security · medium] Credentials are supplied regardless of transport security: with
+`Email:UseStartTls=false` the `AUTH` exchange sends the login/password (base64, not encrypted) over
+the plaintext channel. Since `UseStartTls` is just a boolean in configuration, a typo/legacy setting
+silently leaks the SMTP password. Fail fast when credentials are configured without TLS, e.g. throw
+in the constructor (or add the check to `ProductionSettings.Validate`) if `_options.UserName` is set
+and `!_options.UseStartTls`.
+
++             if (!_options.UseStartTls)
++             {
++                 throw new InvalidOperationException(
++                     "Email:UserName задан, но Email:UseStartTls выключен: пароль уйдёт открытым текстом.");
++             }
++ 
+              client.Credentials = new NetworkCredential(_options.UserName, _options.Password);
+
+
+─── Doska.Infrastructure/Email/SmtpEmailSender.cs:16-16 ───
+[bug · low] The body/header encoding is left at the `MailMessage` defaults, while the sibling
+`FileEmailSender` explicitly writes `charset=utf-8`. With Russian-language content this makes the
+rendered body dependent on `MailMessage`/`SmtpClient` defaults (historically the source of
+mojibake/`us-ascii` fallbacks). Set `BodyEncoding`/`SubjectEncoding` (and `HeadersEncoding`) to
+UTF-8 explicitly so SMTP output matches the file sender.
+
+-         using var message = new MailMessage(_options.From, email, subject, body);
++         using var message = new MailMessage(_options.From, email, subject, body)
++         {
++             BodyEncoding = Encoding.UTF8,
++             SubjectEncoding = Encoding.UTF8,
++             HeadersEncoding = Encoding.UTF8,
++         };
+
+
+─── Doska.Infrastructure/Persistence/Configurations/CityConfiguration.cs:20-20 ───
+[maintainability · low] The maximum length is hard-coded as `200`, duplicating `City.MaxNameLength`
+(see Doska.Domain/Entities/City.cs, which uses the constant both for validation in `Rename` and for
+the error message). If the constant is ever changed, the domain and the database schema silently
+diverge: the entity would accept names the column rejects (DbUpdateException at save time) or vice
+versa. Derive the column length from the constant so there is a single source of truth.
+
+-         builder.Property(city => city.Name).HasMaxLength(200).IsRequired();
++         builder.Property(city => city.Name).HasMaxLength(City.MaxNameLength).IsRequired();
+
+
+─── Doska.Infrastructure/Persistence/Configurations/CityConfiguration.cs:24-24 ───
+[bug · medium] The unique index is case-sensitive (string comparison in PostgreSQL), and
+`CityService.NormalizeAvailableNameAsync` only trims — it does not fold case. As a result "Москва"
+and "москва" (or "москва "/"Москва" written outside the service, e.g. in a seed/migration) are
+stored as two distinct cities while the domain promises `Name` is "уникально". Since the name is
+also the user-visible identifier in city pickers, this produces duplicate entries that are
+indistinguishable in the UI and cannot be reused consistently. Consider enforcing uniqueness on a
+normalized form — a functional unique index on `lower(btrim(name))` created in a migration (or a
+case-insensitive/normalized column) — instead of a plain index on the raw value.
+
+
+
+─── Doska.Infrastructure/Migrations/AppDbContextModelSnapshot.cs:241-241 ───
+[bug · low] Only `sort_order` is constrained for `ad_photos`; `byte_size`, `width` and `height` are
+unconstrained at the schema level, and the `AdPhoto` constructor performs no validation either.
+Zero/negative file sizes or dimensions can therefore be persisted, which can corrupt downstream
+size/thumbnail logic. Consider adding `ck_ad_photos_byte_size` (`byte_size > 0`) and
+`ck_ad_photos_dimensions` (`width > 0 AND height > 0`) check constraints to match the integrity
+level applied to `sort_order`/`price`.
+
+
+
+─── Doska.Infrastructure/Migrations/AppDbContextModelSnapshot.cs:369-372 ───
+[bug · high] `HasPassword` is configured as store-generated (`ValueGeneratedOnAdd` +
+`HasDefaultValue(true)`) on a non-nullable `bool`. EF Core uses the CLR default (`false`) as the
+sentinel for such a property: on INSERT, when the value equals the sentinel it is omitted and
+PostgreSQL applies the DB default (`true`). `User.CreateWithGoogle` explicitly sets `HasPassword =
+false`, so Google-only accounts will silently be persisted with `has_password = true`, defeating the
+"no password" semantics (and any login/UX branch that checks `HasPassword`). This is a classic
+default-value sentinel trap. Either drop the DB default (let the domain-owned value always be sent)
+or configure an explicit sentinel (e.g. `HasSentinel`/nullable) so `false` is written instead of
+being treated as "not set". (Root config is `UserConfiguration.cs`.)
+
+                      b.Property<bool>("HasPassword")
+-                         .ValueGeneratedOnAdd()
+                          .HasColumnType("boolean")
+                          .HasDefaultValue(true)
+
+
+─── Doska.Infrastructure/Persistence/Configurations/AdComplaintConfiguration.cs:47-47 ───
+[performance · medium] `AuthorId` and `ClosedByUserId` are foreign keys with
+`DeleteBehavior.Restrict`, but neither has an index (the unique index `(AdId, AuthorId)` cannot
+serve lookups by `AuthorId` alone because `AuthorId` is not its leading column). PostgreSQL does not
+create indexes for FK columns automatically, so deleting a `User` triggers a sequential scan of
+`ad_complaints` for each of these RESTRICT checks. Add indexes on the FK columns.
+
+          builder.HasIndex(complaint => new { complaint.Status, complaint.CreatedAt });
++         builder.HasIndex(complaint => complaint.AuthorId);
++         builder.HasIndex(complaint => complaint.ClosedByUserId);
+
+
+─── Doska.Infrastructure/Migrations/20261118190042_InitialSchema.cs:88-88 ───
+[bug · medium] `published_at` is `NOT NULL`, but `Ad` sets it to `default(DateTimeOffset)` for
+untrusted authors (status `OnModeration`) and only assigns a real value on `Approve`. Sentinel
+0001-01-01 values therefore end up in the `ix_ads_status_published_at` index, which makes any
+ordering/range query over published ads outside a status filter (or any future `status != 'Active'`
+filter) misleading and forces null checks to become `> DateTimeOffset.MinValue` comparisons. Either
+make the column nullable (`DateTimeOffset? PublishedAt`) so 'not published yet' is explicit, or
+guarantee at the domain level that every inserted ad has a real publication timestamp.
+
+
+
+─── Doska.Infrastructure/Migrations/20261118190042_InitialSchema.cs:285-286 ───
+[security · medium] This unique index is case-sensitive, but registration guards duplicates with a
+case-insensitive pre-check (`user.Email.ToLower() == normalizedEmail.ToLower()` in
+`AuthService.RegisterAsync`). That check is not atomic: two concurrent registrations of `User@x.com`
+and `user@x.com` both pass the pre-check and both insert successfully, leaving two accounts for the
+same mailbox behind a case-sensitive unique index. Enforce the uniqueness in the database with a
+functional index on `lower(email)` (e.g. `migrationBuilder.Sql("CREATE UNIQUE INDEX
+ix_users_email_lower ON users (lower(email));")`) or store a normalized email column. The same
+concern applies to `ix_categories_name` and `ix_cities_name` if those names are compared
+case-insensitively.
+
+
+
+─── Doska.Infrastructure/Migrations/20261118190042_InitialSchema.cs:231-231 ───
+[bug · medium] A non-deferrable unique index on (`ad_id`, `sort_order`) is checked per statement, so
+any in-place reordering of photos in a single transaction (e.g. moving photo 3 to position 1 and
+shifting the rest) hits a duplicate-key violation on the intermediate state, even though the final
+state is valid. The application then has to write temporary out-of-range values, which collides with
+`ck_ad_photos_sort_order` (1..5). Consider making this constraint deferrable, e.g.
+`migrationBuilder.Sql("ALTER TABLE ad_photos ADD CONSTRAINT uq_ad_photos_ad_id_sort_order UNIQUE
+(ad_id, sort_order) DEFERRABLE INITIALLY IMMEDIATE;")` and dropping the plain unique index, so
+reordering can be done inside one deferred transaction.
+
+
+
+─── Doska.Infrastructure/Migrations/20261118190042_InitialSchema.cs:151-152 ───
+[bug · low] `status`, `closed_at` and `closed_by_user_id` are constrained independently, so nothing
+at the database level prevents a `Closed` complaint without a closer/timestamp, or an `Open` one
+that already carries them (the only constraint is the status whitelist). If closure consistency is
+meant to hold, encode it as a check constraint in this migration, e.g.
+`table.CheckConstraint("ck_ad_complaints_closed", "(status = 'Closed' AND closed_at IS NOT NULL AND
+closed_by_user_id IS NOT NULL) OR (status = 'Open' AND closed_at IS NULL AND closed_by_user_id IS
+NULL)")`; otherwise the invariant exists only in application code and is unprotected against partial
+updates.
+
+
+
+─── Doska.Infrastructure/Security/PasswordHasher.cs:35-36 ───
+[security · high] PasswordHasher.Verify does not validate the parsed iteration count or the decoded
+salt/key lengths. Malformed hashes can throw ArgumentOutOfRangeException instead of returning false,
+or cause excessive CPU/allocation use. Validate ranges and fail closed with false.
+
+          if (parts.Length != 3
+-             || !int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var iterations))
++             || !int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var iterations)
++             || iterations <= 0
++             || iterations > MaxIterations)
+
+
+─── Doska.Infrastructure/Security/PasswordHasher.cs:13-13 ───
+[security · low] 100,000 PBKDF2-HMAC-SHA256 iterations is below current OWASP guidance (≈600,000 for
+SHA-256). Since the count is embedded in the stored format, this is not a compatibility problem, but
+new hashes are weaker than recommended; consider raising the default to the latest recommendation.
+
+
+
+─── Doska.Infrastructure/Persistence/Configurations/UserConfiguration.cs:21-21 ───
+[bug · high] `HasDefaultValue(true)` on a non-nullable `bool` creates an EF Core sentinel conflict.
+The CLR default for `bool` is `false`, which EF uses as the "not set" sentinel for store-generated
+columns (`ValueGeneratedOnAdd` + `HasDefaultValue`, as reflected in the snapshot). Consequently,
+when an entity is inserted with `HasPassword = false` — exactly what `User.CreateWithGoogle(...)`
+does — EF omits the column from the INSERT and PostgreSQL applies the default `true`. Google-only
+accounts therefore end up persisted with `HasPassword = true`, so the domain/UI state diverges from
+the DB and password login is attempted against the placeholder hash. Remove the store default (the
+domain already initializes the property to `true`) or otherwise explicitly handle the sentinel.
+
+-         builder.Property(user => user.HasPassword).HasDefaultValue(true).IsRequired();
++         builder.Property(user => user.HasPassword).IsRequired();
+
+
+─── Doska.Infrastructure/Persistence/Configurations/UserConfiguration.cs:30-30 ───
+[bug · medium] The unique index on `Email` is case-sensitive (PostgreSQL text comparison), while the
+application treats emails case-insensitively (`user.Email.ToLower() == normalizedEmail.ToLower()` in
+`AuthService.RegisterAsync`/`LoginAsync`). Emails are not normalized to lowercase before storage
+(`User` ctor keeps the raw value), so the DB constraint does not match the business rule: the
+registration `AnyAsync` check can be bypassed by a race, allowing `A@x.com` and `a@x.com` accounts.
+In addition, `ToLower()` comparisons cannot use this index. Consider storing the email normalized
+(lowercase) and dropping the `ToLower()` in queries, or using a case-insensitive type/collation
+(`citext` / ICU collation) for the column.
+
+
+
+─── Doska.Infrastructure/Seed/CatalogSeedData.cs:14-14 ───
+[maintainability · low] `Cities` (and equally `Sections`) is `public static readonly` but only the
+reference is read-only; the backing arrays remain mutable. Any consumer can overwrite elements (e.g.
+`CatalogSeedData.Cities[0] = "..."`) and silently corrupt the seed data for the rest of the process.
+Since this is shared, effectively constant reference data, expose it through a read-only view
+(`IReadOnlyList<string>` / `ImmutableArray<string>`) to prevent accidental mutation.
+
+-     public static readonly string[] Cities =
++     public static readonly IReadOnlyList<string> Cities =
+
+
+─── Doska.Infrastructure/Seed/AdminSeeder.cs:33-35 ───
+[performance · medium] Case-insensitive lookup is done by applying `lower()` to the `Email` column
+(`candidate.Email.ToLower()`). On PostgreSQL this makes the predicate non-sargable, so the unique
+index on `email` cannot be used and the query degrades to a sequential scan; the folding also
+depends on the database collation. In addition, `FirstOrDefaultAsync` has no deterministic ordering,
+so if the database ever holds two rows whose emails differ only in case (the unique constraint is
+case-sensitive), an arbitrary account would be silently promoted to admin.
+
+Prefer comparing against a normalized value (or an index on `lower(email)`), and validate/normalize
+the email once before storing it so the lookup can be exact.
+
+
+
+─── Doska.Infrastructure/Seed/AdminSeeder.cs:47-49 ───
+[bug · medium] When the matching account already exists, only role/confirmation/password are
+updated; `BlockedAt` is left untouched. `AuthService.LoginAsync` rejects blocked users
+(`ServiceErrorKind.Forbidden`), so promoting a blocked account produces an admin that can never sign
+in, while the command still reports success (returns `false` and exit code 0). Consider unblocking
+the user (or at least reporting the blocked state) when seeding the administrator.
+
+
+
+─── Doska.Infrastructure/Seed/DemoDataSeeder.cs:51-51 ───
+[security · high] The existence check is case-sensitive (`user.Email == email` translates to a plain
+`email = @p` comparison in PostgreSQL), while registration and login compare emails
+case-insensitively (`user.Email.ToLower() == normalizedEmail.ToLower()` in
+`AuthService.RegisterAsync`/`LoginAsync`, and registration preserves the original casing). So if a
+real user already registered as `User@Example.com`, this check misses it and the seeder inserts a
+second row `user@example.com` with the well-known demo password. On login, `FirstOrDefaultAsync`
+with the case-insensitive predicate may then return the demo account for that address,
+authenticating with the publicly known password against an email the real user owns — and the
+seeder's claim of idempotency is broken. Match the case-insensitive comparison used elsewhere.
+
+-             if (await db.Users.AnyAsync(user => user.Email == email, cancellationToken))
++             if (await db.Users.AnyAsync(
++                     user => user.Email.ToLower() == email.ToLower(),
++                     cancellationToken))
+
+
+─── Doska.Infrastructure/Seed/ReferenceDataSeeder.cs:58-60 ───
+[bug · high] ReferenceDataSeeder checks section and subsection names only within the current parent,
+but CategoryConfiguration declares categories.Name globally unique. A name already used elsewhere
+passes these checks and then violates the unique index with DbUpdateException, aborting the seed.
+Check names globally and skip/report occupied names.
+
+              var section = await db.Categories.FirstOrDefaultAsync(
+-                 category => category.Name == sectionName && category.ParentId == null,
++                 category => category.Name == sectionName,
+                  cancellationToken);
++ 
++             if (section is not null && !section.IsSection)
++             {
++                 // Имя занято подразделом: раздел с таким названием создать нельзя.
++                 continue;
++             }
+
+
+─── Doska.Infrastructure/Seed/ReferenceDataSeeder.cs:69-71 ───
+[maintainability · low] All subsections get `SortOrder = 0`, so any query that orders subsections by
+`SortOrder` returns them in a provider-defined (effectively random) order. Assign an incrementing
+order per section instead, as `ExtendedCatalogSeeder` does with its `subsectionOrder` counter.
+
++             var subsectionOrder = 0;
++ 
+              foreach (var subsectionName in subsections)
+              {
++                 subsectionOrder++;
++ 
+                  var exists = await db.Categories.AnyAsync(
+
+
+─── Doska.Infrastructure/Seed/ExtendedCatalogSeeder.cs:110-112 ───
+[performance · medium] `SaveChangesAsync` is called once per section and once per subsection inside
+the loops, so seeding the ~100 categories in `CatalogSeedData` produces ~100 separate database round
+trips and transactions. `Entity.Id` is already generated client-side in the constructor
+(`Guid.CreateVersion7()`), so `SetParent` has a valid `parent.Id` before anything is persisted and
+EF orders the inserts correctly on a single `SaveChanges`. Batch all the `Add` calls and call
+`SaveChangesAsync` once before `return` — this eliminates the N round trips and also makes the whole
+seed atomic (a mid-run failure currently leaves partial data committed).
+
+                  section = new Category(sectionName, sectionOrder, clock.GetUtcNow());
+                  db.Categories.Add(section);
+-                 await db.SaveChangesAsync(cancellationToken);
+
+
+─── Doska.Infrastructure/Seed/ExtendedCatalogSeeder.cs:124-127 ───
+[bug · medium] `CatalogSeedResult.Skipped` is documented as "names occupied by a category with a
+different parent", and the class doc says occupied names are skipped *and reported in the summary*.
+However, this subsection branch silently `continue`s: a subsection name that collides with an
+existing section (or with a subsection under another section) is dropped without ever being added to
+`skipped`, contradicting the reported contract and hiding catalog conflicts from the operator.
+Report it only when the existing category has a different parent (guard with `ParentId`) so that
+already-seeded subsections of this same section are not falsely reported as skipped on idempotent
+re-runs.
+
+-                 if (known.ContainsKey(subsectionName))
++                 if (known.TryGetValue(subsectionName, out var existingSubsection))
++                 {
++                     if (existingSubsection.ParentId != section.Id)
+-                 {
++                     {
++                         skipped.Add(subsectionName);
++                     }
++ 
+                      continue;
+                  }
+
