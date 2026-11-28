@@ -23,8 +23,11 @@ public sealed record ResetPasswordRequest(string Token, string Password);
 /// <summary>Ответ с antiforgery-токеном.</summary>
 public sealed record CsrfResponse(string Token);
 
-/// <summary>Доступность внешних провайдеров входа.</summary>
-public sealed record AuthProvidersResponse(bool Google);
+/// <summary>Доступность внешнего провайдера входа.</summary>
+public sealed record AuthProviderInfo(string Id, string Name, bool Enabled);
+
+/// <summary>Список внешних провайдеров входа.</summary>
+public sealed record AuthProvidersResponse(IReadOnlyList<AuthProviderInfo> Providers);
 
 /// <summary>Сведения о текущем пользователе.</summary>
 public sealed record UserResponse(
@@ -36,7 +39,7 @@ public sealed record UserResponse(
     string? DisplayName,
     string? Contacts,
     bool HasPassword,
-    bool IsGoogleLinked)
+    IReadOnlyList<string> LinkedProviders)
 {
     /// <summary>Создаёт ответ из сведений о пользователе.</summary>
     public static UserResponse From(AuthenticatedUser user)
@@ -49,5 +52,5 @@ public sealed record UserResponse(
             user.DisplayName,
             user.Contacts,
             user.HasPassword,
-            user.IsGoogleLinked);
+            user.LinkedProviders);
 }

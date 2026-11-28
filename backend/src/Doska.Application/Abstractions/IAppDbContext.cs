@@ -12,6 +12,9 @@ public interface IAppDbContext
     /// <summary>Пользователи.</summary>
     DbSet<User> Users { get; }
 
+    /// <summary>Идентичности внешних провайдеров входа.</summary>
+    DbSet<ExternalLogin> ExternalLogins { get; }
+
     /// <summary>Одноразовые токены пользователей.</summary>
     DbSet<UserToken> UserTokens { get; }
 

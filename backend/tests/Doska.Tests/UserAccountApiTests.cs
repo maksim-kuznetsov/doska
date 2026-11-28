@@ -117,9 +117,8 @@ public sealed class UserAccountApiTests : IClassFixture<ApiFactory>, IAsyncLifet
 
         await TestDatabase.WithContextAsync(_factory, async db =>
         {
-            db.Users.Add(User.CreateWithGoogle(
+            db.Users.Add(User.CreatePasswordless(
                 email,
-                $"google-subject-{Guid.NewGuid():N}",
                 "placeholder-hash",
                 DateTimeOffset.UtcNow));
             await db.SaveChangesAsync(ct);

@@ -149,9 +149,11 @@ POSTGRES_PASSWORD=<длинный случайный пароль>
 DOMAIN=doska.example.com
 ACME_EMAIL=admin@example.com
 App__PublicBaseUrl=https://doska.example.com
-# Google-вход необязателен; значения добавляются после создания OAuth-клиента (шаг 8).
+# Внешний вход необязателен; значения добавляются после создания OAuth-клиента (шаг 8).
 # Google__ClientId=<client id>
 # Google__ClientSecret=<client secret>
+# Yandex__ClientId=<client id>
+# Yandex__ClientSecret=<client secret>
 Email__Mode=File
 Email__OutboxPath=/srv/doska/outbox
 # SMTP-параметры — после подтверждения домена отправителя и переключения на Email__Mode=Smtp.
@@ -226,30 +228,48 @@ docker compose -f docker-compose.prod.yml up -d api
 
 Проверка: зарегистрируйте тестовый аккаунт, письмо должно прийти на указанный адрес, а ссылка подтверждения — открываться по адресу `https://doska.example.com/confirm-email?token=...`. Подробности и список бесплатных провайдеров — в разделе «Почта в production».
 
-### Шаг 8. Вход через Google
+### Шаг 8. Вход через Google и Яндекс
 
-Google-вход необязателен: без кредов приложение работает как раньше, а кнопка входа скрыта.
+Внешний вход необязателен: без кредов приложение работает как раньше, а кнопки входа скрыты. Провайдеры настраиваются независимо.
+
+Google:
 
 1. В Google Cloud Console откройте **APIs & Services → Credentials → Create credentials → OAuth client ID**.
 2. Тип приложения — **Web application**, в **Authorized redirect URIs** укажите:
    `https://<домен>/api/auth/google/callback`.
-3. Добавьте в `.env` на сервере:
+
+Яндекс ID:
+
+1. В сервисе [Яндекс OAuth](https://oauth.yandex.ru/) создайте приложение типа
+   **Для авторизации пользователей** и укажите Redirect URI
+   `https://<домен>/api/auth/yandex/callback`.
+2. В доступах приложения выберите **Логин, имя и фамилия** (`login:info`) и **Адрес
+   электронной почты** (`login:email`): доступ к email обязателен для входа.
+3. Пройдите верификацию сервиса у Яндекса: без неё пользователи видят предупреждение на
+   странице согласия, и конверсия входа падает.
+
+Добавьте выбранные креды в `.env` на сервере:
 
    ```dotenv
    Google__ClientId=<client id>
    Google__ClientSecret='<client secret>'
+   Yandex__ClientId=<client id>
+   Yandex__ClientSecret='<client secret>'
    ```
 
-   Секрет с символами `$`, `#` или кавычками заключите в одинарные кавычки. Значения хранятся только в `.env` и не попадают в репозиторий.
-4. Пересоздайте API:
+   Секреты с символами `$`, `#` или кавычками заключите в одинарные кавычки. Значения хранятся только в `.env` и не попадают в репозиторий.
+
+Пересоздайте API:
 
    ```bash
    docker compose -f docker-compose.prod.yml up -d api
    ```
 
-5. Проверьте: `curl -fsS https://doska.example.com/api/auth/providers` возвращает `{"google":true}`, на странице входа появилась кнопка Google, а в профиле доступна привязка.
+Проверьте: `curl -fsS https://doska.example.com/api/auth/providers` возвращает список вида
+`{"providers":[{"id":"google","name":"Google","enabled":true},{"id":"yandex","name":"Яндекс","enabled":true}]}`,
+на странице входа появились кнопки настроенных провайдеров, а в профиле доступна привязка.
 
-Для отключения провайдера удалите оба значения из `.env` и пересоздайте API.
+Для отключения провайдера удалите его пару значений из `.env` и пересоздайте API.
 
 ### Шаг 9. Резервное копирование
 
@@ -282,7 +302,7 @@ crontab -e
 - В браузере устанавливается PWA (DevTools → Application → Manifest/Service Workers).
 - Регистрация проходит, письмо приходит, ссылка подтверждения открывается.
 - Вход администратора работает, видны категории и города.
-- При настроенном Google работают вход нового пользователя, автоматическая привязка существующего аккаунта и привязка из профиля.
+- При настроенных провайдерах работают вход нового пользователя, автоматическая привязка существующего аккаунта и привязка из профиля.
 - Подача объявления с фотографией и одобрение модератором проходят.
 - `docker compose -f docker-compose.prod.yml ps` не показывает нездоровых сервисов.
 - `docker compose -f docker-compose.prod.yml logs --tail=100 api` не содержит ошибок.
@@ -375,9 +395,11 @@ docker compose -f docker-compose.prod.yml up -d --build
 | `POSTGRES_PASSWORD` | да | Пароль базы. Генерируйте случайным. |
 | `DOMAIN` | да | Домен для сертификата и сайта. |
 | `ACME_EMAIL` | да | Адрес для уведомлений Let's Encrypt. |
-| `App__PublicBaseUrl` | да | Публичный адрес сайта для ссылок в письмах и возврата после Google-входа. |
-| `Google__ClientId` | нет | Идентификатор OAuth-клиента Google; вместе с секретом включает Google-вход. |
+| `App__PublicBaseUrl` | да | Публичный адрес сайта для ссылок в письмах и возврата после внешнего входа. |
+| `Google__ClientId` | нет | Идентификатор OAuth-клиента Google; вместе с секретом включает вход через Google. |
 | `Google__ClientSecret` | нет | Секрет OAuth-клиента Google. Храните только в `.env`. |
+| `Yandex__ClientId` | нет | Идентификатор приложения Яндекс OAuth; вместе с секретом включает вход через Яндекс. |
+| `Yandex__ClientSecret` | нет | Секрет приложения Яндекс OAuth. Храните только в `.env`. |
 | `Email__Mode` | нет, по умолчанию `File` | Режим отправки: `File` (текущий, письма в `Email__OutboxPath`) или `Smtp` (после подтверждения домена). |
 | `Email__Host` | да, при режиме `Smtp` | SMTP-хост провайдера. |
 | `Email__Port` | нет, по умолчанию `587` | SMTP-порт. |
@@ -551,7 +573,7 @@ sudo grep 'client intended to send too large body' /var/log/nginx/error.log
 docker compose -f docker-compose.prod.yml exec caddy caddy list-certificates
 ```
 
-## 8. Правовые страницы и проверка Google OAuth
+## 8. Правовые страницы и проверка OAuth
 
 После публикации проверьте, что политика и условия открываются без входа:
 
@@ -568,6 +590,9 @@ curl -fsS https://<публичный-домен>/terms | grep -q '<div id="app"
 1. **Privacy policy URL** — `https://<публичный-домен>/privacy`.
 2. **Terms of service URL** — `https://<публичный-домен>/terms`.
 3. Убедитесь, что страницы открываются без входа, и отправьте приложение на проверку.
+
+При регистрации приложения Яндекс OAuth те же адреса указываются в пунктах политики
+конфиденциальности и условий использования.
 
 Реквизиты и даты редакции меняются в `frontend/src/legal/details.ts`; после изменения текстов
 пересоберите и выложите `web` обычным релизом.

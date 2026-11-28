@@ -28,6 +28,7 @@ vi.mock('../../api/client', () =>
   }),
 )
 
+import type { AuthProviderInfo } from '../../api/client'
 import { ApiError } from '../../api/client'
 import { useAuthStore } from '../../stores/auth'
 import ProfileView from '../ProfileView.vue'
@@ -36,6 +37,9 @@ const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: { template: '<div />' } },
   { path: '/profile', name: 'profile', component: ProfileView },
 ]
+
+const googleProvider: AuthProviderInfo = { id: 'google', name: 'Google', enabled: true }
+const googleLinked: AuthProviderInfo = { id: 'google', name: 'Google', enabled: true }
 
 const currentUser = {
   id: 'user-1',
@@ -46,15 +50,15 @@ const currentUser = {
   displayName: 'Иван',
   contacts: '+7 900 000-00-00',
   hasPassword: true,
-  isGoogleLinked: false,
+  linkedProviders: [] as string[],
 }
 
 async function mountView(
   options: {
     path?: string
-    googleEnabled?: boolean
+    providers?: AuthProviderInfo[]
+    linkedProviders?: string[]
     hasPassword?: boolean
-    isGoogleLinked?: boolean
   } = {},
 ) {
   const pinia = createPinia()
@@ -64,11 +68,11 @@ async function mountView(
   auth.user = {
     ...currentUser,
     hasPassword: options.hasPassword ?? true,
-    isGoogleLinked: options.isGoogleLinked ?? false,
+    linkedProviders: options.linkedProviders ?? [],
   }
-  auth.googleEnabled = options.googleEnabled ?? false
+  auth.providers = options.providers ?? []
   me.mockResolvedValue({ ...currentUser, hasPassword: true })
-  providers.mockResolvedValue({ google: options.googleEnabled ?? false })
+  providers.mockResolvedValue({ providers: options.providers ?? [] })
 
   const wrapper = await mountWithRouter({
     component: ProfileView,
@@ -107,7 +111,7 @@ describe('ProfileView', () => {
       displayName: 'Иван',
       contacts: '+7 900 000-00-00',
       hasPassword: true,
-      isGoogleLinked: false,
+      linkedProviders: [],
     })
 
     const { wrapper } = await mountView()
@@ -146,7 +150,7 @@ describe('ProfileView', () => {
   })
 
   it('предлагает привязать Google при доступном провайдере', async () => {
-    const { wrapper } = await mountView({ googleEnabled: true })
+    const { wrapper } = await mountView({ providers: [googleProvider] })
 
     const link = wrapper.find('a[href="/api/auth/google/link"]')
 
@@ -155,7 +159,10 @@ describe('ProfileView', () => {
   })
 
   it('показывает привязанный Google', async () => {
-    const { wrapper } = await mountView({ isGoogleLinked: true })
+    const { wrapper } = await mountView({
+      providers: [googleLinked],
+      linkedProviders: ['google'],
+    })
 
     expect(wrapper.text()).toContain('Google привязан к аккаунту')
     expect(wrapper.find('a[href="/api/auth/google/link"]').exists()).toBe(false)
@@ -164,7 +171,8 @@ describe('ProfileView', () => {
   it('показывает успех привязки из query', async () => {
     const { wrapper } = await mountView({
       path: '/profile?google=linked',
-      isGoogleLinked: true,
+      providers: [googleProvider],
+      linkedProviders: ['google'],
     })
     await flushPromises()
 
@@ -174,7 +182,7 @@ describe('ProfileView', () => {
   it('показывает ошибку привязки из query', async () => {
     const { wrapper } = await mountView({
       path: '/profile?google=error&reason=conflict',
-      googleEnabled: true,
+      providers: [googleProvider],
     })
     await flushPromises()
 

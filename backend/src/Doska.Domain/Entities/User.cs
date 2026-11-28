@@ -17,11 +17,8 @@ public class User : Entity
     /// <summary>Хеш пароля; исходный пароль не хранится.</summary>
     public string PasswordHash { get; private set; } = string.Empty;
 
-    /// <summary>Признак заданного пароля; у аккаунта, созданного через Google, пароля нет.</summary>
+    /// <summary>Признак заданного пароля; у аккаунта, созданного через внешний вход, пароля нет.</summary>
     public bool HasPassword { get; private set; } = true;
-
-    /// <summary>Идентификатор Google-пользователя (claim <c>sub</c>); <c>null</c> — Google не привязан.</summary>
-    public string? GoogleSubject { get; private set; }
 
     /// <summary>Роль пользователя; у пользователя ровно одна роль.</summary>
     public UserRole Role { get; private set; } = UserRole.User;
@@ -75,51 +72,23 @@ public class User : Entity
     }
 
     /// <summary>
-    /// Создаёт подтверждённый аккаунт, привязанный к Google, без известного пароля.
-    /// Хеш-заглушка нужна только для совместимости схемы и не позволяет войти по паролю.
+    /// Создаёт подтверждённый аккаунт без известного пароля: используется при первом
+    /// входе через внешнего провайдера. Хеш-заглушка нужна только для совместимости
+    /// схемы и не позволяет войти по паролю.
     /// </summary>
-    /// <param name="email">Подтверждённый адрес электронной почты из Google.</param>
-    /// <param name="googleSubject">Идентификатор Google-пользователя.</param>
+    /// <param name="email">Подтверждённый адрес электронной почты из провайдера.</param>
     /// <param name="placeholderPasswordHash">Непригодный для входа хеш случайного значения.</param>
     /// <param name="now">Момент создания.</param>
-    public static User CreateWithGoogle(
+    public static User CreatePasswordless(
         string email,
-        string googleSubject,
         string placeholderPasswordHash,
         DateTimeOffset now)
     {
-        var user = new User(email, placeholderPasswordHash, UserRole.User, now)
+        return new User(email, placeholderPasswordHash, UserRole.User, now)
         {
-            GoogleSubject = NormalizeGoogleSubject(googleSubject),
             HasPassword = false,
             IsEmailConfirmed = true,
         };
-
-        return user;
-    }
-
-    /// <summary>
-    /// Привязывает Google-идентичность к аккаунту. Повторная привязка той же
-    /// идентичности ничего не меняет; другая идентичность отклоняется.
-    /// </summary>
-    /// <param name="googleSubject">Идентификатор Google-пользователя.</param>
-    /// <param name="now">Момент привязки.</param>
-    public void LinkGoogle(string googleSubject, DateTimeOffset now)
-    {
-        var normalized = NormalizeGoogleSubject(googleSubject);
-
-        if (string.Equals(GoogleSubject, normalized, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        if (GoogleSubject is not null)
-        {
-            throw new InvalidOperationException("К аккаунту уже привязана другая Google-идентичность.");
-        }
-
-        GoogleSubject = normalized;
-        MarkUpdated(now);
     }
 
     /// <summary>
@@ -184,8 +153,8 @@ public class User : Entity
 
     /// <summary>
     /// Сбрасывает пароль: вход по паролю становится недоступен, а вместо хеша
-    /// сохраняется заглушка. Используется при автоматической привязке Google,
-    /// чтобы прежний владелец пароля не сохранил доступ к аккаунту.
+    /// сохраняется заглушка. Используется при автоматической привязке внешнего
+    /// провайдера, чтобы прежний владелец пароля не сохранил доступ к аккаунту.
     /// </summary>
     /// <param name="placeholderHash">Хеш случайного значения вместо настоящего пароля.</param>
     /// <param name="now">Момент изменения.</param>
@@ -243,12 +212,12 @@ public class User : Entity
     }
 
     /// <summary>
-    /// Заполняет отображаемое имя из внешней идентичности Google, только если оно ещё не задано.
+    /// Заполняет отображаемое имя из внешней идентичности, только если оно ещё не задано.
     /// Пустое или слишком длинное значение игнорируется, заданное имя не перезаписывается.
     /// </summary>
-    /// <param name="displayName">Имя из Google.</param>
+    /// <param name="displayName">Имя из внешнего провайдера.</param>
     /// <param name="now">Момент изменения.</param>
-    public void ApplyGoogleDisplayName(string? displayName, DateTimeOffset now)
+    public void ApplyExternalDisplayName(string? displayName, DateTimeOffset now)
     {
         if (DisplayName is not null)
         {
@@ -270,16 +239,5 @@ public class User : Entity
     {
         var trimmed = value?.Trim();
         return string.IsNullOrEmpty(trimmed) ? null : trimmed;
-    }
-
-    private static string NormalizeGoogleSubject(string googleSubject)
-    {
-        var trimmed = googleSubject?.Trim();
-        if (string.IsNullOrEmpty(trimmed))
-        {
-            throw new ArgumentException("Идентификатор Google не может быть пустым.", nameof(googleSubject));
-        }
-
-        return trimmed;
     }
 }

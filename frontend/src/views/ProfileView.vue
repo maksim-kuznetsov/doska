@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { api } from '../api/client'
 import { messageOf } from '../api/errors'
-import { googleErrorMessage, googleLinkUrl } from '../api/googleAuth'
+import { externalErrorMessage, externalLinkUrl } from '../api/externalAuth'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
 import FormSection from '../components/FormSection.vue'
@@ -17,15 +17,24 @@ const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 
-const googleMessage = ref('')
-const googleError = ref('')
+const providerMessage = ref('')
+const providerError = ref('')
 const needsPassword = computed(() => auth.user?.hasPassword === false)
 
+const linkableProviders = computed(() =>
+  auth.providers.filter(
+    (provider) => provider.enabled || (auth.user?.linkedProviders.includes(provider.id) ?? false),
+  ),
+)
+
 onMounted(() => {
-  if (route.query.google === 'linked') {
-    googleMessage.value = 'Google привязан к аккаунту.'
-  } else if (route.query.google === 'error') {
-    googleError.value = googleErrorMessage(route.query.reason)
+  const linked = auth.providers.find((provider) => route.query[provider.id] === 'linked')
+  const failed = auth.providers.find((provider) => route.query[provider.id] === 'error')
+
+  if (linked) {
+    providerMessage.value = `${linked.name} привязан к аккаунту.`
+  } else if (failed) {
+    providerError.value = externalErrorMessage(failed.id, route.query.reason)
   } else {
     return
   }
@@ -129,22 +138,23 @@ async function changePassword(): Promise<void> {
       </AppButton>
     </form>
 
-    <FormSection
-      v-if="auth.googleEnabled || auth.user?.isGoogleLinked"
-      title="Вход через Google"
-    >
-      <p v-if="auth.user?.isGoogleLinked" class="text-muted">
-        Google привязан к аккаунту: можно входить без пароля.
-      </p>
-      <template v-else>
-        <p class="text-muted">
-          Привяжите Google, чтобы входить в аккаунт без пароля.
+    <FormSection v-if="linkableProviders.length > 0" title="Вход без пароля">
+      <template v-for="provider in linkableProviders" :key="provider.id">
+        <p v-if="auth.user?.linkedProviders.includes(provider.id)" class="text-muted">
+          {{ provider.name }} привязан к аккаунту: можно входить без пароля.
         </p>
-        <a class="btn btn--secondary" :href="googleLinkUrl()">Привязать Google</a>
+        <template v-else>
+          <p class="text-muted">
+            Привяжите {{ provider.name }}, чтобы входить в аккаунт без пароля.
+          </p>
+          <a class="btn btn--secondary" :href="externalLinkUrl(provider.id)">
+            Привязать {{ provider.name }}
+          </a>
+        </template>
       </template>
 
-      <AppMessage v-if="googleMessage" variant="success">{{ googleMessage }}</AppMessage>
-      <AppMessage v-if="googleError" variant="error">{{ googleError }}</AppMessage>
+      <AppMessage v-if="providerMessage" variant="success">{{ providerMessage }}</AppMessage>
+      <AppMessage v-if="providerError" variant="error">{{ providerError }}</AppMessage>
     </FormSection>
 
     <form class="stack" @submit.prevent="changePassword">

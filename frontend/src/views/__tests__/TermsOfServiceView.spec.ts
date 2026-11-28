@@ -22,7 +22,7 @@ describe('TermsOfServiceView', () => {
     const wrapper = await mountView()
 
     expect(wrapper.get('.legal__title').text()).toBe('Условия использования')
-    expect(wrapper.get('.legal__updated').text()).toContain('26 ноября 2026')
+    expect(wrapper.get('.legal__updated').text()).toContain('27 ноября 2026')
   })
 
   it('показывает кириллический адрес сайта, а ссылка ведёт на ASCII-домен', async () => {
@@ -47,7 +47,7 @@ describe('TermsOfServiceView', () => {
 
     expect(text).toContain('подтверждение email обязательно')
     expect(text).toContain('передавать аккаунт третьим лицам запрещено')
-    expect(text).toContain('созданный через Google')
+    expect(text).toContain('созданный через внешнего провайдера')
   })
 
   it('указывает правила объявлений и суточный лимит в пять объявлений', async () => {

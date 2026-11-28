@@ -264,5 +264,5 @@ public sealed class UserProfileApiTests : IClassFixture<ApiFactory>, IAsyncLifet
         string? DisplayName,
         string? Contacts,
         bool HasPassword,
-        bool IsGoogleLinked);
+        IReadOnlyList<string> LinkedProviders);
 }

@@ -27,6 +27,8 @@ vi.mock('../../api/client', () =>
 
 import { useAuthStore } from '../auth'
 
+const googleProvider = { id: 'google', name: 'Google', enabled: true }
+
 describe('auth store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -35,7 +37,7 @@ describe('auth store', () => {
     updateProfile.mockReset()
   })
 
-  it('загружает пользователя и доступность Google параллельно', async () => {
+  it('загружает пользователя и список провайдеров параллельно', async () => {
     const store = useAuthStore()
     const user = {
       id: 'user-1',
@@ -46,20 +48,20 @@ describe('auth store', () => {
       displayName: null,
       contacts: null,
       hasPassword: false,
-      isGoogleLinked: true,
+      linkedProviders: ['google'],
     }
 
     me.mockResolvedValue(user)
-    providers.mockResolvedValue({ google: true })
+    providers.mockResolvedValue({ providers: [googleProvider] })
 
     await store.load()
 
     expect(store.user).toEqual(user)
-    expect(store.googleEnabled).toBe(true)
+    expect(store.providers).toEqual([googleProvider])
     expect(store.loaded).toBe(true)
   })
 
-  it('не ломает загрузку сессии при недоступном статусе провайдера', async () => {
+  it('не ломает загрузку сессии при недоступном списке провайдеров', async () => {
     const store = useAuthStore()
     const user = {
       id: 'user-1',
@@ -70,7 +72,7 @@ describe('auth store', () => {
       displayName: null,
       contacts: null,
       hasPassword: true,
-      isGoogleLinked: false,
+      linkedProviders: [],
     }
 
     me.mockResolvedValue(user)
@@ -79,7 +81,7 @@ describe('auth store', () => {
     await store.load()
 
     expect(store.user).toEqual(user)
-    expect(store.googleEnabled).toBe(false)
+    expect(store.providers).toEqual([])
   })
 
   it('обновляет пользователя из ответа после сохранения профиля', async () => {
@@ -93,7 +95,7 @@ describe('auth store', () => {
       displayName: null,
       contacts: null,
       hasPassword: true,
-      isGoogleLinked: false,
+      linkedProviders: [],
     }
 
     const updated = { ...store.user, displayName: 'Иван', contacts: '+7 900 000-00-00' }

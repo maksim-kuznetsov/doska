@@ -32,6 +32,9 @@ public sealed class AppDbContext : DbContext, IAppDbContext
     /// <summary>Пользователи.</summary>
     public DbSet<User> Users => Set<User>();
 
+    /// <summary>Идентичности внешних провайдеров входа.</summary>
+    public DbSet<ExternalLogin> ExternalLogins => Set<ExternalLogin>();
+
     /// <summary>Одноразовые токены подтверждения почты и сброса пароля.</summary>
     public DbSet<UserToken> UserTokens => Set<UserToken>();
 

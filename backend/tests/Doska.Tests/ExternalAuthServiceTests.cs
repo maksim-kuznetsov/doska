@@ -9,14 +9,16 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Doska.Tests;
 
-/// <summary>Разрешение Google-идентичности и привязка к аккаунту.</summary>
-public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLifetime
+/// <summary>Разрешение идентичности внешнего провайдера и привязка к аккаунту.</summary>
+public sealed class ExternalAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLifetime
 {
-    private const string EmailPrefix = "google-auth-";
+    private const string EmailPrefix = "external-auth-";
+    private const string Google = "google";
+    private const string Yandex = "yandex";
 
     private readonly ApiFactory _factory;
 
-    public GoogleAuthServiceTests(ApiFactory factory)
+    public ExternalAuthServiceTests(ApiFactory factory)
     {
         _factory = factory;
     }
@@ -40,22 +42,23 @@ public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLi
     }
 
     [Fact]
-    public async Task Unknown_google_identity_creates_confirmed_passwordless_account()
+    public async Task Unknown_identity_creates_confirmed_passwordless_account()
     {
         await EnsureDatabaseAsync();
         var ct = TestContext.Current.CancellationToken;
         var email = UniqueEmail();
-        const string subject = "google-subject-new";
+        const string subject = "external-subject-new";
 
         var authenticated = await WithServiceAsync(
-            service => service.SignInAsync(subject, email, null, emailVerified: true, ct));
+            service => service.SignInAsync(Google, subject, email, null, emailVerified: true, ct));
 
         var user = await FindUserAsync(email, ct);
         Assert.Equal(user.Id, authenticated.Id);
-        Assert.Equal(subject, user.GoogleSubject);
+        Assert.Equal(subject, await FindSubjectAsync(user.Id, Google, ct));
         Assert.True(user.IsEmailConfirmed);
         Assert.False(user.HasPassword);
         Assert.Equal(UserRole.User, user.Role);
+        Assert.Contains(Google, authenticated.LinkedProviders);
     }
 
     [Fact]
@@ -68,13 +71,13 @@ public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLi
         await AddUserAsync(user, ct);
 
         var authenticated = await WithServiceAsync(
-            service => service.SignInAsync("google-subject-auto", email.ToUpperInvariant(), null, true, ct));
+            service => service.SignInAsync(Google, "external-subject-auto", email.ToUpperInvariant(), null, true, ct));
 
         var stored = await FindUserAsync(email, ct);
         Assert.Equal(user.Id, authenticated.Id);
-        Assert.Equal("google-subject-auto", stored.GoogleSubject);
+        Assert.Equal("external-subject-auto", await FindSubjectAsync(user.Id, Google, ct));
         Assert.True(stored.IsEmailConfirmed);
-        // При автоматической привязке Google прежний пароль инвалидируется,
+        // При автоматической привязке прежний пароль инвалидируется,
         // чтобы исключить pre-hijacking атаку.
         Assert.False(stored.HasPassword);
         Assert.Equal(1, await CountUsersAsync(email, ct));
@@ -86,13 +89,13 @@ public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLi
         await EnsureDatabaseAsync();
         var ct = TestContext.Current.CancellationToken;
         var email = UniqueEmail();
-        const string subject = "google-subject-stable";
+        const string subject = "external-subject-stable";
 
         var first = await WithServiceAsync(
-            service => service.SignInAsync(subject, email, null, true, ct));
+            service => service.SignInAsync(Google, subject, email, null, true, ct));
 
         var second = await WithServiceAsync(
-            service => service.SignInAsync(subject, UniqueEmail(), null, true, ct));
+            service => service.SignInAsync(Google, subject, UniqueEmail(), null, true, ct));
 
         Assert.Equal(first.Id, second.Id);
         Assert.Equal(1, await CountUsersAsync(email, ct));
@@ -104,9 +107,9 @@ public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLi
         await EnsureDatabaseAsync();
         var ct = TestContext.Current.CancellationToken;
         var email = UniqueEmail();
-        const string subject = "google-subject-blocked";
+        const string subject = "external-subject-blocked";
 
-        await WithServiceAsync(service => service.SignInAsync(subject, email, null, true, ct));
+        await WithServiceAsync(service => service.SignInAsync(Google, subject, email, null, true, ct));
 
         await TestDatabase.WithContextAsync(_factory, async db =>
         {
@@ -116,7 +119,7 @@ public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLi
         });
 
         var exception = await Assert.ThrowsAsync<ServiceException>(() =>
-            WithServiceAsync(service => service.SignInAsync(subject, email, null, true, ct)));
+            WithServiceAsync(service => service.SignInAsync(Google, subject, email, null, true, ct)));
 
         Assert.Equal(ServiceErrorKind.Forbidden, exception.Kind);
     }
@@ -127,18 +130,14 @@ public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLi
         await EnsureDatabaseAsync();
         var ct = TestContext.Current.CancellationToken;
         var email = UniqueEmail();
-        var user = User.CreateWithGoogle(
-            email,
-            "google-subject-first",
-            "placeholder",
-            DateTimeOffset.UtcNow);
-        await AddUserAsync(user, ct);
+        var user = await AddLinkedUserAsync(email, Google, "external-subject-first", ct);
 
         var exception = await Assert.ThrowsAsync<ServiceException>(() =>
-            WithServiceAsync(service => service.SignInAsync("google-subject-second", email, null, true, ct)));
+            WithServiceAsync(service =>
+                service.SignInAsync(Google, "external-subject-second", email, null, true, ct)));
 
         Assert.Equal(ServiceErrorKind.Conflict, exception.Kind);
-        Assert.Equal("google-subject-first", (await FindUserAsync(email, ct)).GoogleSubject);
+        Assert.Equal("external-subject-first", await FindSubjectAsync(user.Id, Google, ct));
     }
 
     [Fact]
@@ -149,7 +148,8 @@ public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLi
         var email = UniqueEmail();
 
         var exception = await Assert.ThrowsAsync<ServiceException>(() =>
-            WithServiceAsync(service => service.SignInAsync("google-subject-unverified", email, null, false, ct)));
+            WithServiceAsync(service =>
+                service.SignInAsync(Google, "external-subject-unverified", email, null, false, ct)));
 
         Assert.Equal(ServiceErrorKind.Validation, exception.Kind);
         Assert.Equal(0, await CountUsersAsync(email, ct));
@@ -165,11 +165,11 @@ public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLi
         await AddUserAsync(user, ct);
 
         var authenticated = await WithServiceAsync(
-            service => service.LinkAsync(user.Id, "google-subject-link", UniqueEmail(), null, true, ct));
+            service => service.LinkAsync(user.Id, Google, "external-subject-link", UniqueEmail(), null, true, ct));
 
         var stored = await FindUserAsync(accountEmail, ct);
         Assert.Equal(user.Id, authenticated.Id);
-        Assert.Equal("google-subject-link", stored.GoogleSubject);
+        Assert.Equal("external-subject-link", await FindSubjectAsync(user.Id, Google, ct));
         Assert.Equal(accountEmail, stored.Email);
         Assert.False(stored.IsEmailConfirmed);
     }
@@ -184,7 +184,7 @@ public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLi
         await AddUserAsync(user, ct);
 
         await WithServiceAsync(
-            service => service.LinkAsync(user.Id, "google-subject-link-match", email, null, true, ct));
+            service => service.LinkAsync(user.Id, Google, "external-subject-link-match", email, null, true, ct));
 
         Assert.True((await FindUserAsync(email, ct)).IsEmailConfirmed);
     }
@@ -195,12 +195,7 @@ public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLi
         await EnsureDatabaseAsync();
         var ct = TestContext.Current.CancellationToken;
         var ownerEmail = UniqueEmail();
-        var owner = User.CreateWithGoogle(
-            ownerEmail,
-            "google-subject-owner",
-            "placeholder",
-            DateTimeOffset.UtcNow);
-        await AddUserAsync(owner, ct);
+        var owner = await AddLinkedUserAsync(ownerEmail, Google, "external-subject-owner", ct);
 
         var userEmail = UniqueEmail();
         var user = new User(userEmail, "hash", UserRole.User, DateTimeOffset.UtcNow);
@@ -208,10 +203,11 @@ public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLi
 
         var exception = await Assert.ThrowsAsync<ServiceException>(() =>
             WithServiceAsync(service =>
-                service.LinkAsync(user.Id, "google-subject-owner", userEmail, null, true, ct)));
+                service.LinkAsync(user.Id, Google, "external-subject-owner", userEmail, null, true, ct)));
 
         Assert.Equal(ServiceErrorKind.Conflict, exception.Kind);
-        Assert.Null((await FindUserAsync(userEmail, ct)).GoogleSubject);
+        Assert.Null(await FindSubjectAsync(user.Id, Google, ct));
+        Assert.Equal("external-subject-owner", await FindSubjectAsync(owner.Id, Google, ct));
     }
 
     [Fact]
@@ -220,19 +216,14 @@ public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLi
         await EnsureDatabaseAsync();
         var ct = TestContext.Current.CancellationToken;
         var email = UniqueEmail();
-        var user = User.CreateWithGoogle(
-            email,
-            "google-subject-current",
-            "placeholder",
-            DateTimeOffset.UtcNow);
-        await AddUserAsync(user, ct);
+        var user = await AddLinkedUserAsync(email, Google, "external-subject-current", ct);
 
         var exception = await Assert.ThrowsAsync<ServiceException>(() =>
             WithServiceAsync(service =>
-                service.LinkAsync(user.Id, "google-subject-other", email, null, true, ct)));
+                service.LinkAsync(user.Id, Google, "external-subject-other", email, null, true, ct)));
 
         Assert.Equal(ServiceErrorKind.Conflict, exception.Kind);
-        Assert.Equal("google-subject-current", (await FindUserAsync(email, ct)).GoogleSubject);
+        Assert.Equal("external-subject-current", await FindSubjectAsync(user.Id, Google, ct));
     }
 
     [Fact]
@@ -241,35 +232,51 @@ public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLi
         await EnsureDatabaseAsync();
         var ct = TestContext.Current.CancellationToken;
         var email = UniqueEmail();
-        var user = User.CreateWithGoogle(
-            email,
-            "google-subject-same",
-            "placeholder",
-            DateTimeOffset.UtcNow);
-        await AddUserAsync(user, ct);
+        var user = await AddLinkedUserAsync(email, Google, "external-subject-same", ct);
 
         var authenticated = await WithServiceAsync(service =>
-            service.LinkAsync(user.Id, "google-subject-same", email, null, true, ct));
+            service.LinkAsync(user.Id, Google, "external-subject-same", email, null, true, ct));
 
         Assert.Equal(user.Id, authenticated.Id);
-        Assert.Equal("google-subject-same", (await FindUserAsync(email, ct)).GoogleSubject);
+        Assert.Equal("external-subject-same", await FindSubjectAsync(user.Id, Google, ct));
+        Assert.Equal(1, await CountProvidersAsync(user.Id, Google, ct));
     }
 
     [Fact]
-    public async Task New_google_account_saves_google_name_as_display_name()
+    public async Task Second_provider_links_to_the_same_account()
+    {
+        await EnsureDatabaseAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var email = UniqueEmail();
+        var user = await AddLinkedUserAsync(email, Google, "external-subject-google", ct);
+
+        await WithServiceAsync(service =>
+            service.LinkAsync(user.Id, Yandex, "external-subject-yandex", UserEmail("yandex"), null, true, ct));
+
+        var authenticated = await WithServiceAsync(service =>
+            service.SignInAsync(Google, "external-subject-google", email, null, true, ct));
+
+        Assert.Equal("external-subject-google", await FindSubjectAsync(user.Id, Google, ct));
+        Assert.Equal("external-subject-yandex", await FindSubjectAsync(user.Id, Yandex, ct));
+        Assert.Contains(Google, authenticated.LinkedProviders);
+        Assert.Contains(Yandex, authenticated.LinkedProviders);
+    }
+
+    [Fact]
+    public async Task New_account_saves_provider_name_as_display_name()
     {
         await EnsureDatabaseAsync();
         var ct = TestContext.Current.CancellationToken;
         var email = UniqueEmail();
 
         await WithServiceAsync(
-            service => service.SignInAsync("google-subject-name-new", email, "Иван Иванов", true, ct));
+            service => service.SignInAsync(Google, "external-subject-name-new", email, "Иван Иванов", true, ct));
 
         Assert.Equal("Иван Иванов", (await FindUserAsync(email, ct)).DisplayName);
     }
 
     [Fact]
-    public async Task Auto_link_fills_empty_display_name_from_google()
+    public async Task Auto_link_fills_empty_display_name()
     {
         await EnsureDatabaseAsync();
         var ct = TestContext.Current.CancellationToken;
@@ -278,13 +285,13 @@ public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLi
         await AddUserAsync(user, ct);
 
         await WithServiceAsync(
-            service => service.SignInAsync("google-subject-name-auto", email, "Пётр", true, ct));
+            service => service.SignInAsync(Google, "external-subject-name-auto", email, "Пётр", true, ct));
 
         Assert.Equal("Пётр", (await FindUserAsync(email, ct)).DisplayName);
     }
 
     [Fact]
-    public async Task Explicit_link_fills_empty_display_name_from_google()
+    public async Task Explicit_link_fills_empty_display_name()
     {
         await EnsureDatabaseAsync();
         var ct = TestContext.Current.CancellationToken;
@@ -293,7 +300,7 @@ public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLi
         await AddUserAsync(user, ct);
 
         await WithServiceAsync(
-            service => service.LinkAsync(user.Id, "google-subject-name-link", email, "Мария", true, ct));
+            service => service.LinkAsync(user.Id, Google, "external-subject-name-link", email, "Мария", true, ct));
 
         Assert.Equal("Мария", (await FindUserAsync(email, ct)).DisplayName);
     }
@@ -304,26 +311,23 @@ public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLi
         await EnsureDatabaseAsync();
         var ct = TestContext.Current.CancellationToken;
         var email = UniqueEmail();
-        const string subject = "google-subject-name-keep";
+        const string subject = "external-subject-name-keep";
 
-        await WithServiceAsync(
-            service => service.SignInAsync(subject, email, "Первый", true, ct));
-
-        await WithServiceAsync(
-            service => service.SignInAsync(subject, email, "Другой", true, ct));
+        await WithServiceAsync(service => service.SignInAsync(Google, subject, email, "Первый", true, ct));
+        await WithServiceAsync(service => service.SignInAsync(Google, subject, email, "Другой", true, ct));
 
         Assert.Equal("Первый", (await FindUserAsync(email, ct)).DisplayName);
     }
 
     [Fact]
-    public async Task Missing_google_name_does_not_break_sign_in()
+    public async Task Missing_provider_name_does_not_break_sign_in()
     {
         await EnsureDatabaseAsync();
         var ct = TestContext.Current.CancellationToken;
         var email = UniqueEmail();
 
         var authenticated = await WithServiceAsync(
-            service => service.SignInAsync("google-subject-name-absent", email, null, true, ct));
+            service => service.SignInAsync(Yandex, "external-subject-name-absent", email, null, true, ct));
 
         var stored = await FindUserAsync(email, ct);
         Assert.Equal(stored.Id, authenticated.Id);
@@ -331,6 +335,8 @@ public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLi
     }
 
     private static string UniqueEmail() => $"{EmailPrefix}{Guid.NewGuid():N}@example.com";
+
+    private static string UserEmail(string label) => $"{EmailPrefix}{label}-{Guid.NewGuid():N}@example.com";
 
     private async Task EnsureDatabaseAsync()
     {
@@ -340,10 +346,10 @@ public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLi
         }
     }
 
-    private async Task<T> WithServiceAsync<T>(Func<GoogleAuthService, Task<T>> action)
+    private async Task<T> WithServiceAsync<T>(Func<ExternalAuthService, Task<T>> action)
         => await TestDatabase.WithServicesAsync(
             _factory,
-            provider => action(provider.GetRequiredService<GoogleAuthService>()));
+            provider => action(provider.GetRequiredService<ExternalAuthService>()));
 
     private async Task<User> FindUserAsync(string email, CancellationToken cancellationToken)
         => await TestDatabase.WithContextAsync(_factory, async db =>
@@ -355,10 +361,43 @@ public sealed class GoogleAuthServiceTests : IClassFixture<ApiFactory>, IAsyncLi
         => await TestDatabase.WithContextAsync(_factory, async db =>
             await db.Users.CountAsync(candidate => candidate.Email == email, cancellationToken));
 
+    private async Task<string?> FindSubjectAsync(Guid userId, string provider, CancellationToken cancellationToken)
+        => await TestDatabase.WithContextAsync(_factory, async db =>
+            await db.ExternalLogins
+                .AsNoTracking()
+                .Where(login => login.UserId == userId && login.Provider == provider)
+                .Select(login => login.Subject)
+                .FirstOrDefaultAsync(cancellationToken));
+
+    private async Task<int> CountProvidersAsync(Guid userId, string provider, CancellationToken cancellationToken)
+        => await TestDatabase.WithContextAsync(_factory, async db =>
+            await db.ExternalLogins.CountAsync(
+                login => login.UserId == userId && login.Provider == provider,
+                cancellationToken));
+
     private async Task AddUserAsync(User user, CancellationToken cancellationToken)
         => await TestDatabase.WithContextAsync(_factory, async db =>
         {
             db.Users.Add(user);
             await db.SaveChangesAsync(cancellationToken);
         });
+
+    private async Task<User> AddLinkedUserAsync(
+        string email,
+        string provider,
+        string subject,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var user = User.CreatePasswordless(email, "placeholder-hash", now);
+
+        await TestDatabase.WithContextAsync(_factory, async db =>
+        {
+            db.Users.Add(user);
+            db.ExternalLogins.Add(new ExternalLogin(user.Id, provider, subject, now));
+            await db.SaveChangesAsync(cancellationToken);
+        });
+
+        return user;
+    }
 }

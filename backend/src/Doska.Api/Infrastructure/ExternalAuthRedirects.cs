@@ -2,8 +2,8 @@ using System.Text;
 
 namespace Doska.Api.Infrastructure;
 
-/// <summary>Безопасные адреса возврата после Google-входа.</summary>
-public static class GoogleRedirects
+/// <summary>Безопасные адреса возврата после входа через внешнего провайдера.</summary>
+public static class ExternalAuthRedirects
 {
     private const int MaxPathLength = 2048;
 
@@ -63,13 +63,14 @@ public static class GoogleRedirects
         return $"{baseUrl}{normalizedPath}";
     }
 
-    /// <summary>Собирает адрес с query-параметрами ошибки Google-входа.</summary>
-    public static string ErrorPath(string path, string reason)
+    /// <summary>Собирает адрес с query-параметрами ошибки входа через провайдера.</summary>
+    public static string ErrorPath(string path, string providerId, string reason)
     {
         var safePath = SafeLocalPath(path);
         var builder = new StringBuilder(safePath);
         builder.Append(safePath.Contains('?') ? '&' : '?');
-        builder.Append("google=error&reason=");
+        builder.Append(Uri.EscapeDataString(providerId));
+        builder.Append("=error&reason=");
         builder.Append(Uri.EscapeDataString(reason));
         return builder.ToString();
     }

@@ -15,9 +15,9 @@ export const publicSiteDisplayUrl = 'https://doska.мкузнецов.рф:8443/
 
 export const contactEmail = 'maksim.kuznetsov@live.ru'
 
-export const privacyUpdatedAt = '2026-11-26'
+export const privacyUpdatedAt = '2026-11-27'
 
-export const termsUpdatedAt = '2026-11-26'
+export const termsUpdatedAt = '2026-11-27'
 
 export const googlePrivacyPolicyUrl = 'https://policies.google.com/privacy'
 

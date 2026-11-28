@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
+using AspNet.Security.OAuth.Yandex;
 using Doska.Api.Background;
 using Doska.Api.Infrastructure;
 using Doska.Application.Abstractions;
@@ -20,6 +21,7 @@ using Doska.Infrastructure.Security;
 using Doska.Infrastructure.Seed;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -122,10 +124,24 @@ builder.Services.Configure<PublicUrlOptions>(builder.Configuration.GetSection(Pu
 builder.Services.Configure<MediaOptions>(builder.Configuration.GetSection(MediaOptions.SectionName));
 builder.Services.Configure<GoogleSignInOptions>(
     builder.Configuration.GetSection(GoogleSignInOptions.SectionName));
+builder.Services.Configure<YandexSignInOptions>(
+    builder.Configuration.GetSection(YandexSignInOptions.SectionName));
 
 var googleSettings = builder.Configuration
     .GetSection(GoogleSignInOptions.SectionName)
     .Get<GoogleSignInOptions>() ?? new GoogleSignInOptions();
+var yandexSettings = builder.Configuration
+    .GetSection(YandexSignInOptions.SectionName)
+    .Get<YandexSignInOptions>() ?? new YandexSignInOptions();
+
+// Провайдеры известны всегда, чтобы публичный список сообщал доступность;
+// обработчик входа добавляется только при наличии настроек.
+builder.Services.AddSingleton<IExternalAuthProviderRegistry>(new ExternalAuthProviderRegistry(
+[
+    new ExternalAuthProvider("google", "Google", GoogleDefaults.AuthenticationScheme, googleSettings.IsConfigured),
+    new ExternalAuthProvider("yandex", "Яндекс", YandexAuthenticationDefaults.AuthenticationScheme, yandexSettings.IsConfigured),
+]));
+
 builder.Services.AddSingleton<IPublicUrlProvider, ConfiguredPublicUrlProvider>();
 builder.Services.AddScoped<IAdPhotoStorage, LocalAdPhotoStorage>();
 builder.Services.AddScoped<IMediaMaintenance, MediaMaintenanceService>();
@@ -167,7 +183,7 @@ switch (emailMode.Trim().ToLowerInvariant())
 builder.Services.AddScoped<IEmailOutbox, FileEmailOutbox>();
 
 builder.Services.AddScoped<AuthService>();
-builder.Services.AddScoped<GoogleAuthService>();
+builder.Services.AddScoped<ExternalAuthService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<AdService>();
@@ -227,26 +243,31 @@ var authentication = builder.Services
         };
     });
 
-// Google-провайдер подключается только при наличии кредов. Без них приложение
-// работает как раньше, а публичный статус провайдера сообщает, что вход выключен.
-if (googleSettings.IsConfigured)
+// Внешние провайдеры подключаются только при наличии кредов. Без них приложение
+// работает как раньше, а публичный список сообщает, что вход выключен.
+var hasExternalProvider = googleSettings.IsConfigured || yandexSettings.IsConfigured;
+
+if (hasExternalProvider)
 {
-    authentication.AddCookie(GoogleAuthentication.ExternalScheme, options =>
+    authentication.AddCookie(ExternalAuthentication.ExternalScheme, options =>
     {
-        options.Cookie.Name = "doska.google";
+        options.Cookie.Name = "doska.external";
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
         options.ExpireTimeSpan = TimeSpan.FromMinutes(10);
         options.SlidingExpiration = false;
     });
+}
 
+if (googleSettings.IsConfigured)
+{
     authentication.AddGoogle(options =>
     {
         options.ClientId = googleSettings.ClientId!.Trim();
         options.ClientSecret = googleSettings.ClientSecret!.Trim();
         options.CallbackPath = "/api/auth/google/callback";
-        options.SignInScheme = GoogleAuthentication.ExternalScheme;
+        options.SignInScheme = ExternalAuthentication.ExternalScheme;
         options.SaveTokens = false;
 
         options.Scope.Clear();
@@ -259,10 +280,37 @@ if (googleSettings.IsConfigured)
         options.CorrelationCookie.SameSite = SameSiteMode.Lax;
         options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 
-        options.Events.OnCreatingTicket = GoogleAuthentication.OnCreatingTicket;
-        options.Events.OnTicketReceived = GoogleAuthentication.OnTicketReceived;
-        options.Events.OnRemoteFailure = GoogleAuthentication.OnRemoteFailure;
-        options.Events.OnAccessDenied = GoogleAuthentication.OnAccessDenied;
+        options.Events.OnCreatingTicket = ExternalAuthentication.GoogleOnCreatingTicket;
+        options.Events.OnTicketReceived = ExternalAuthentication.OnTicketReceived;
+        options.Events.OnRemoteFailure = ExternalAuthentication.OnRemoteFailure;
+        options.Events.OnAccessDenied = ExternalAuthentication.OnAccessDenied;
+    });
+}
+
+if (yandexSettings.IsConfigured)
+{
+    authentication.AddYandex(options =>
+    {
+        options.ClientId = yandexSettings.ClientId!.Trim();
+        options.ClientSecret = yandexSettings.ClientSecret!.Trim();
+        options.CallbackPath = "/api/auth/yandex/callback";
+        options.SignInScheme = ExternalAuthentication.ExternalScheme;
+        options.SaveTokens = false;
+
+        // Обязательный доступ к email: по нему выполняется автопривязка к аккаунту.
+        options.Scope.Clear();
+        options.Scope.Add("login:info");
+        options.Scope.Add("login:email");
+
+        options.CorrelationCookie.Name = "doska.yandex.correlation";
+        options.CorrelationCookie.HttpOnly = true;
+        options.CorrelationCookie.SameSite = SameSiteMode.Lax;
+        options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+
+        options.Events.OnCreatingTicket = ExternalAuthentication.YandexOnCreatingTicket;
+        options.Events.OnTicketReceived = ExternalAuthentication.OnTicketReceived;
+        options.Events.OnRemoteFailure = ExternalAuthentication.OnRemoteFailure;
+        options.Events.OnAccessDenied = ExternalAuthentication.OnAccessDenied;
     });
 }
 
@@ -330,9 +378,9 @@ if (!app.Environment.IsDevelopment())
     app.UseForwardedHeaders();
 }
 
-// Google OAuth строит redirect_uri из Host запроса. Обратный прокси может
-// потерять нестандартный порт, поэтому для этих путей берём публичный адрес сайта.
-app.UseGooglePublicHost();
+// OAuth-провайдеры строят redirect_uri из Host запроса. Обратный прокси может
+// потерять нестандартный порт, поэтому для путей внешнего входа берём публичный адрес сайта.
+app.UseExternalAuthPublicHost();
 
 if (app.Environment.IsDevelopment())
 {

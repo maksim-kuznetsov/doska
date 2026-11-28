@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { messageOf } from '../api/errors'
-import { googleErrorMessage, googleStartUrl } from '../api/googleAuth'
+import { externalErrorMessage, externalStartUrl } from '../api/externalAuth'
 import AppButton from '../components/AppButton.vue'
 import AppMessage from '../components/AppMessage.vue'
 import TextField from '../components/TextField.vue'
@@ -21,10 +21,11 @@ const submitting = ref(false)
 const redirect = computed(() =>
   typeof route.query.redirect === 'string' ? route.query.redirect : null,
 )
-const googleHref = computed(() => googleStartUrl(redirect.value))
-const googleError = computed(() =>
-  route.query.google === 'error' ? googleErrorMessage(route.query.reason) : '',
-)
+const enabledProviders = computed(() => auth.providers.filter((provider) => provider.enabled))
+const providerError = computed(() => {
+  const failed = auth.providers.find((provider) => route.query[provider.id] === 'error')
+  return failed ? externalErrorMessage(failed.id, route.query.reason) : ''
+})
 
 async function submit(): Promise<void> {
   error.value = ''
@@ -72,11 +73,18 @@ async function submit(): Promise<void> {
       </AppButton>
     </form>
 
-    <AppMessage v-if="googleError" variant="error">{{ googleError }}</AppMessage>
+    <AppMessage v-if="providerError" variant="error">{{ providerError }}</AppMessage>
 
-    <template v-if="auth.googleEnabled">
+    <template v-if="enabledProviders.length > 0">
       <p class="text-muted">Или войдите без пароля:</p>
-      <a class="btn btn--secondary btn--block" :href="googleHref">Войти через Google</a>
+      <a
+        v-for="provider in enabledProviders"
+        :key="provider.id"
+        class="btn btn--secondary btn--block"
+        :href="externalStartUrl(provider.id, redirect)"
+      >
+        Войти через {{ provider.name }}
+      </a>
     </template>
 
     <p class="text-muted">

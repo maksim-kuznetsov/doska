@@ -39,7 +39,7 @@ function userWith(displayName: string | null, contacts: string | null): CurrentU
     displayName,
     contacts,
     hasPassword: true,
-    isGoogleLinked: false,
+    linkedProviders: [],
   }
 }
 

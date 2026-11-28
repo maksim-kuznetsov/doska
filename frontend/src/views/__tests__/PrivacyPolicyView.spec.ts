@@ -8,7 +8,7 @@ describe('PrivacyPolicyView', () => {
 
   it('показывает заголовок и дату редакции', () => {
     expect(wrapper.get('.legal__title').text()).toBe('Политика конфиденциальности')
-    expect(wrapper.get('.legal__updated').text()).toContain('26 ноября 2026')
+    expect(wrapper.get('.legal__updated').text()).toContain('27 ноября 2026')
   })
 
   it('называет оператора, адрес сайта и контакт', () => {
@@ -27,6 +27,7 @@ describe('PrivacyPolicyView', () => {
 
     expect(text).toContain('хеш пароля')
     expect(text).toContain('идентификатор пользователя Google')
+    expect(text).toContain('Яндекс ID')
     expect(text).toContain('подтверждения email')
     expect(text).toContain('cookie-сессия')
     expect(text).toContain('объявления')

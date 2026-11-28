@@ -20,7 +20,7 @@ public sealed class ClaimsPrincipalExtensionsTests
             DisplayName: "Модератор",
             Contacts: null,
             HasPassword: true,
-            IsGoogleLinked: false);
+            LinkedProviders: []);
 
         var principal = ClaimsPrincipalExtensions.CreateSessionPrincipal(user);
 

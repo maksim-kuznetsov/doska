@@ -41,17 +41,32 @@
 
    Адрес — http://localhost:5173; запросы к `/api` проксируются на http://localhost:5000.
 
-### Вход через Google локально
+### Внешний вход локально (Google и Яндекс)
 
-Google-вход необязателен: без настроек приложение работает как раньше, а кнопка входа скрыта.
+Вход через внешнего провайдера необязателен: без настроек приложение работает как раньше,
+а кнопка входа скрыта. Провайдеры настраиваются независимо и появляются в списке
+`/api/auth/providers`.
+
+Google:
 
 1. В Google Cloud Console создайте OAuth-клиент типа **Web application**.
 2. В поле **Authorized redirect URIs** добавьте `http://localhost:5173/api/auth/google/callback`.
-3. Запустите API с кредами в переменных окружения:
+
+Яндекс ID:
+
+1. В сервисе [Яндекс OAuth](https://oauth.yandex.ru/) создайте приложение типа
+   **Для авторизации пользователей** и укажите Redirect URI
+   `http://localhost:5173/api/auth/yandex/callback`.
+2. В доступах приложения выберите **Логин, имя и фамилия** (`login:info`) и **Адрес
+   электронной почты** (`login:email`): доступ к email обязателен для входа.
+
+Запуск API с кредами в переменных окружения:
 
    ```
    $env:Google__ClientId="<client id>"
    $env:Google__ClientSecret="<client secret>"
+   $env:Yandex__ClientId="<client id>"
+   $env:Yandex__ClientSecret="<client secret>"
    dotnet run --project backend/src/Doska.Api
    ```
 
@@ -212,7 +227,7 @@ ssh "$DOSKA_PROD_SSH" 'cd /srv/doska && bash deploy/release.sh'
 
 Политика конфиденциальности доступна по адресу `/privacy`, условия использования — по `/terms`.
 Страницы открываются без входа и не обращаются к API, поэтому их можно указывать в Google Cloud
-Console при настройке входа через Google.
+Console при настройке входа через Google и при регистрации приложения Яндекс OAuth.
 
 - Локально: http://localhost:5173/privacy и http://localhost:5173/terms.
 - В production: `<публичный адрес сайта>/privacy` и `<публичный адрес сайта>/terms`.

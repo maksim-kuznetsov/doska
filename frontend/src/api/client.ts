@@ -12,11 +12,17 @@ export interface CurrentUser {
   displayName: string | null
   contacts: string | null
   hasPassword: boolean
-  isGoogleLinked: boolean
+  linkedProviders: string[]
+}
+
+export interface AuthProviderInfo {
+  id: string
+  name: string
+  enabled: boolean
 }
 
 export interface AuthProviders {
-  google: boolean
+  providers: AuthProviderInfo[]
 }
 
 export interface AdPhotoSummary {

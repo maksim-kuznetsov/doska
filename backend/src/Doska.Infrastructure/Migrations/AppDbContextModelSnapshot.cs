@@ -326,6 +326,51 @@ namespace Doska.Infrastructure.Migrations
                     b.ToTable("cities", (string)null);
                 });
 
+            modelBuilder.Entity("Doska.Domain.Entities.ExternalLogin", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("subject");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_external_logins");
+
+                    b.HasIndex("Provider", "Subject")
+                        .IsUnique()
+                        .HasDatabaseName("ix_external_logins_provider_subject");
+
+                    b.HasIndex("UserId", "Provider")
+                        .IsUnique()
+                        .HasDatabaseName("ix_external_logins_user_id_provider");
+
+                    b.ToTable("external_logins", (string)null);
+                });
+
             modelBuilder.Entity("Doska.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -361,11 +406,6 @@ namespace Doska.Infrastructure.Migrations
                         .HasColumnType("character varying(320)")
                         .HasColumnName("email");
 
-                    b.Property<string>("GoogleSubject")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("google_subject");
-
                     b.Property<bool>("HasPassword")
                         .HasColumnType("boolean")
                         .HasColumnName("has_password");
@@ -400,10 +440,6 @@ namespace Doska.Infrastructure.Migrations
                     b.HasIndex("Email")
                         .IsUnique()
                         .HasDatabaseName("ix_users_email");
-
-                    b.HasIndex("GoogleSubject")
-                        .IsUnique()
-                        .HasDatabaseName("ix_users_google_subject");
 
                     b.ToTable("users", null, t =>
                         {
@@ -546,6 +582,18 @@ namespace Doska.Infrastructure.Migrations
                         .HasConstraintName("fk_categories_categories_parent_id");
 
                     b.Navigation("Parent");
+                });
+
+            modelBuilder.Entity("Doska.Domain.Entities.ExternalLogin", b =>
+                {
+                    b.HasOne("Doska.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_external_logins_users_user_id");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Doska.Domain.Entities.UserToken", b =>

@@ -18,10 +18,10 @@ public sealed record AuthenticatedUser(
     string? DisplayName,
     string? Contacts,
     bool HasPassword,
-    bool IsGoogleLinked)
+    IReadOnlyList<string> LinkedProviders)
 {
-    /// <summary>Создаёт сведения о пользователе из сущности.</summary>
-    public static AuthenticatedUser From(User user)
+    /// <summary>Создаёт сведения о пользователе из сущности и списка привязанных провайдеров.</summary>
+    public static AuthenticatedUser From(User user, IReadOnlyList<string>? linkedProviders = null)
         => new(
             user.Id,
             user.Email,
@@ -31,7 +31,7 @@ public sealed record AuthenticatedUser(
             user.DisplayName,
             user.Contacts,
             user.HasPassword,
-            user.GoogleSubject is not null);
+            linkedProviders ?? []);
 }
 
 /// <summary>Регистрация, вход и подтверждение email.</summary>
@@ -121,7 +121,7 @@ public sealed class AuthService(
             throw new ServiceException(ServiceErrorKind.Forbidden, "Аккаунт заблокирован. Обратитесь к администрации.");
         }
 
-        return AuthenticatedUser.From(user);
+        return AuthenticatedUser.From(user, await ProvidersAsync(user.Id, cancellationToken));
     }
 
     /// <summary>Подтверждает email по одноразовому коду.</summary>
@@ -339,8 +339,16 @@ public sealed class AuthService(
             throw new ServiceException(ServiceErrorKind.Forbidden, "Аккаунт заблокирован. Обратитесь к администрации.");
         }
 
-        return AuthenticatedUser.From(user);
+        return AuthenticatedUser.From(user, await ProvidersAsync(user.Id, cancellationToken));
     }
+
+    private async Task<IReadOnlyList<string>> ProvidersAsync(
+        Guid userId,
+        CancellationToken cancellationToken)
+        => await db.ExternalLogins
+            .Where(login => login.UserId == userId)
+            .Select(login => login.Provider)
+            .ToListAsync(cancellationToken);
 
     private string CreateToken(Guid userId, TokenPurpose purpose, TimeSpan lifetime)
     {

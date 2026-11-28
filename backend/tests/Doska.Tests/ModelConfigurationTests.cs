@@ -37,12 +37,13 @@ public sealed class ModelConfigurationTests : IDisposable
     public void Dispose() => _context.Dispose();
 
     [Fact]
-    public void Model_contains_seven_entity_types()
+    public void Model_contains_eight_entity_types()
     {
         var entityTypes = Model.GetEntityTypes().Select(entityType => entityType.ClrType).ToArray();
 
-        Assert.Equal(7, entityTypes.Length);
+        Assert.Equal(8, entityTypes.Length);
         Assert.Contains(typeof(User), entityTypes);
+        Assert.Contains(typeof(ExternalLogin), entityTypes);
         Assert.Contains(typeof(UserToken), entityTypes);
         Assert.Contains(typeof(City), entityTypes);
         Assert.Contains(typeof(Category), entityTypes);
@@ -53,6 +54,7 @@ public sealed class ModelConfigurationTests : IDisposable
 
     [Theory]
     [InlineData(typeof(User), "users")]
+    [InlineData(typeof(ExternalLogin), "external_logins")]
     [InlineData(typeof(UserToken), "user_tokens")]
     [InlineData(typeof(City), "cities")]
     [InlineData(typeof(Category), "categories")]
@@ -83,7 +85,8 @@ public sealed class ModelConfigurationTests : IDisposable
 
     [Theory]
     [InlineData(typeof(User), nameof(User.Email), "character varying(320)")]
-    [InlineData(typeof(User), nameof(User.GoogleSubject), "character varying(255)")]
+    [InlineData(typeof(ExternalLogin), nameof(ExternalLogin.Provider), "character varying(32)")]
+    [InlineData(typeof(ExternalLogin), nameof(ExternalLogin.Subject), "character varying(255)")]
     [InlineData(typeof(User), nameof(User.HasPassword), "boolean")]
     [InlineData(typeof(User), nameof(User.Role), "character varying(20)")]
     [InlineData(typeof(UserToken), nameof(UserToken.TokenHash), "character varying(64)")]
@@ -123,7 +126,8 @@ public sealed class ModelConfigurationTests : IDisposable
 
     [Theory]
     [InlineData(typeof(User), "Email", true)]
-    [InlineData(typeof(User), "GoogleSubject", true)]
+    [InlineData(typeof(ExternalLogin), "Provider,Subject", true)]
+    [InlineData(typeof(ExternalLogin), "UserId,Provider", true)]
     [InlineData(typeof(City), "Name", true)]
     [InlineData(typeof(Category), "Name", true)]
     [InlineData(typeof(UserToken), "TokenHash", true)]
@@ -171,6 +175,7 @@ public sealed class ModelConfigurationTests : IDisposable
     [InlineData(typeof(AdComplaint), "AuthorId", typeof(User), DeleteBehavior.Restrict)]
     [InlineData(typeof(AdComplaint), "ClosedByUserId", typeof(User), DeleteBehavior.Restrict)]
     [InlineData(typeof(UserToken), "UserId", typeof(User), DeleteBehavior.Cascade)]
+    [InlineData(typeof(ExternalLogin), "UserId", typeof(User), DeleteBehavior.Cascade)]
     [InlineData(typeof(Category), "ParentId", typeof(Category), DeleteBehavior.Restrict)]
     public void Foreign_key_delete_behavior_is_configured(
         Type dependentClrType,

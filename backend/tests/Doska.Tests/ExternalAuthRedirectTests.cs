@@ -2,8 +2,8 @@ using Doska.Api.Infrastructure;
 
 namespace Doska.Tests;
 
-/// <summary>Безопасный разбор адреса возврата после Google-входа.</summary>
-public sealed class GoogleRedirectTests
+/// <summary>Безопасный разбор адреса возврата после внешнего входа.</summary>
+public sealed class ExternalAuthRedirectTests
 {
     [Theory]
     [InlineData("/", "/")]
@@ -12,7 +12,7 @@ public sealed class GoogleRedirectTests
     [InlineData("  /ads?page=2  ", "/ads?page=2")]
     public void Local_path_is_kept(string value, string expected)
     {
-        Assert.Equal(expected, GoogleRedirects.SafeLocalPath(value));
+        Assert.Equal(expected, ExternalAuthRedirects.SafeLocalPath(value));
     }
 
     [Theory]
@@ -27,7 +27,7 @@ public sealed class GoogleRedirectTests
     [InlineData("/%5cevil.example.com")]
     public void External_or_unsafe_path_falls_back_to_home(string? value)
     {
-        Assert.Equal("/", GoogleRedirects.SafeLocalPath(value));
+        Assert.Equal("/", ExternalAuthRedirects.SafeLocalPath(value));
     }
 
     [Fact]
@@ -35,17 +35,18 @@ public sealed class GoogleRedirectTests
     {
         Assert.Equal(
             "https://doska.example.com/ads",
-            GoogleRedirects.ToAbsolute("https://doska.example.com/", "/ads"));
+            ExternalAuthRedirects.ToAbsolute("https://doska.example.com/", "/ads"));
     }
 
     [Fact]
-    public void Error_path_appends_query_parameters_safely()
+    public void Error_path_appends_provider_query_parameters_safely()
     {
         Assert.Equal(
             "/login?google=error&reason=blocked",
-            GoogleRedirects.ErrorPath("/login", "blocked"));
+            ExternalAuthRedirects.ErrorPath("/login", "google", "blocked"));
+
         Assert.Equal(
-            "/profile?from=google&google=error&reason=conflict",
-            GoogleRedirects.ErrorPath("/profile?from=google", "conflict"));
+            "/profile?from=google&yandex=error&reason=conflict",
+            ExternalAuthRedirects.ErrorPath("/profile?from=google", "yandex", "conflict"));
     }
 }

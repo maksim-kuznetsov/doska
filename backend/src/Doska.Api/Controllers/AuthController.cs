@@ -4,11 +4,9 @@ using Doska.Api.Infrastructure;
 using Doska.Application.Auth;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.Extensions.Options;
 
 namespace Doska.Api.Controllers;
 
@@ -17,7 +15,7 @@ namespace Doska.Api.Controllers;
 [Route("api/auth")]
 public sealed class AuthController(
     AuthService authService,
-    IOptions<GoogleSignInOptions> googleOptions) : ControllerBase
+    IExternalAuthProviderRegistry providers) : ControllerBase
 {
     /// <summary>Выдаёт antiforgery-токен для изменяющих запросов.</summary>
     [HttpGet("csrf")]
@@ -45,38 +43,48 @@ public sealed class AuthController(
     [HttpGet("providers")]
     [AllowAnonymous]
     public ActionResult<AuthProvidersResponse> Providers()
-        => Ok(new AuthProvidersResponse(googleOptions.Value.IsConfigured));
+        => Ok(new AuthProvidersResponse(
+            providers.Providers
+                .Select(provider => new AuthProviderInfo(
+                    provider.Id,
+                    provider.DisplayName,
+                    provider.IsConfigured))
+                .ToList()));
 
-    /// <summary>Начинает вход через Google.</summary>
-    [HttpGet("google/start")]
+    /// <summary>Начинает вход через внешнего провайдера.</summary>
+    [HttpGet("{provider}/start")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicies.Sensitive)]
-    public IActionResult GoogleStart([FromQuery] string? redirect)
+    public IActionResult Start(string provider, [FromQuery] string? redirect)
     {
-        if (!googleOptions.Value.IsConfigured)
+        var resolved = ResolveProvider(provider);
+
+        if (resolved is null)
         {
-            return GoogleUnavailable();
+            return ProviderUnavailable();
         }
 
         return Challenge(
-            GoogleAuthentication.LoginProperties(redirect),
-            GoogleDefaults.AuthenticationScheme);
+            ExternalAuthentication.LoginProperties(resolved.Id, redirect),
+            resolved.Scheme);
     }
 
-    /// <summary>Начинает привязку Google к текущему аккаунту.</summary>
-    [HttpGet("google/link")]
+    /// <summary>Начинает привязку внешнего провайдера к текущему аккаунту.</summary>
+    [HttpGet("{provider}/link")]
     [Authorize]
     [EnableRateLimiting(RateLimitPolicies.Sensitive)]
-    public IActionResult GoogleLink()
+    public IActionResult Link(string provider)
     {
-        if (!googleOptions.Value.IsConfigured)
+        var resolved = ResolveProvider(provider);
+
+        if (resolved is null)
         {
-            return GoogleUnavailable();
+            return ProviderUnavailable();
         }
 
         return Challenge(
-            GoogleAuthentication.LinkProperties(User.GetRequiredUserId()),
-            GoogleDefaults.AuthenticationScheme);
+            ExternalAuthentication.LinkProperties(resolved.Id, User.GetRequiredUserId()),
+            resolved.Scheme);
     }
 
     /// <summary>Выполняет вход по email и паролю.</summary>
@@ -165,12 +173,17 @@ public sealed class AuthController(
             ClaimsPrincipalExtensions.CreateSessionPrincipal(user));
     }
 
-    private ObjectResult GoogleUnavailable()
-        => StatusCode(
-            StatusCodes.Status503ServiceUnavailable,
-            new ProblemDetails
-            {
-                Status = StatusCodes.Status503ServiceUnavailable,
-                Title = "Вход через Google не настроен.",
-            });
+    private ObjectResult ProviderUnavailable()
+        => NotFound(new ProblemDetails
+        {
+            Status = StatusCodes.Status404NotFound,
+            Title = "Провайдер входа не настроен.",
+        });
+
+    /// <summary>Возвращает настроенного провайдера или <c>null</c>, если он неизвестен либо выключен.</summary>
+    private ExternalAuthProvider? ResolveProvider(string provider)
+    {
+        var resolved = providers.Find(provider);
+        return resolved is { IsConfigured: true } ? resolved : null;
+    }
 }

@@ -9,13 +9,17 @@ vi.mock('../../api/client', () =>
   createApiClientMock({
     auth: {
       login: vi.fn(),
-      providers: () => Promise.resolve({ google: false }),
+      providers: () => Promise.resolve({ providers: [] }),
     },
   }),
 )
 
+import type { AuthProviderInfo } from '../../api/client'
 import { useAuthStore } from '../../stores/auth'
 import LoginView from '../LoginView.vue'
+
+const googleProvider: AuthProviderInfo = { id: 'google', name: 'Google', enabled: true }
+const yandexProvider: AuthProviderInfo = { id: 'yandex', name: 'Яндекс', enabled: true }
 
 const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: { template: '<div />' } },
@@ -31,12 +35,12 @@ const routes: RouteRecordRaw[] = [
   { path: '/privacy', name: 'privacy', component: { template: '<div />' } },
 ]
 
-async function mountView(path = '/login', googleEnabled = false) {
+async function mountView(path = '/login', providers: AuthProviderInfo[] = []) {
   const pinia = createPinia()
   setActivePinia(pinia)
 
   const auth = useAuthStore()
-  auth.googleEnabled = googleEnabled
+  auth.providers = providers
 
   const wrapper = await mountWithRouter({
     component: LoginView,
@@ -62,7 +66,7 @@ describe('LoginView', () => {
   })
 
   it('показывает Google-вход с текущим адресом возврата', async () => {
-    const { wrapper } = await mountView('/login?redirect=/ads?page=2', true)
+    const { wrapper } = await mountView('/login?redirect=/ads?page=2', [googleProvider])
 
     const link = wrapper.find('a[href^="/api/auth/google/start"]')
 
@@ -73,14 +77,24 @@ describe('LoginView', () => {
     expect(link.text()).toContain('Войти через Google')
   })
 
-  it('скрывает Google-вход при выключенном провайдере', async () => {
-    const { wrapper } = await mountView('/login', false)
+  it('показывает вход через Яндекс', async () => {
+    const { wrapper } = await mountView('/login', [yandexProvider])
 
-    expect(wrapper.find('a[href^="/api/auth/google/start"]').exists()).toBe(false)
+    const link = wrapper.get('a[href^="/api/auth/yandex/start"]')
+
+    expect(link.attributes('href')).toBe('/api/auth/yandex/start?redirect=%2F')
+    expect(link.text()).toContain('Войти через Яндекс')
   })
 
-  it('показывает ошибку Google-входа из query', async () => {
-    const { wrapper } = await mountView('/login?google=error&reason=blocked', true)
+  it('скрывает внешний вход при выключенных провайдерах', async () => {
+    const { wrapper } = await mountView('/login', [])
+
+    expect(wrapper.find('a[href^="/api/auth/google/start"]').exists()).toBe(false)
+    expect(wrapper.find('a[href^="/api/auth/yandex/start"]').exists()).toBe(false)
+  })
+
+  it('показывает ошибку входа из query', async () => {
+    const { wrapper } = await mountView('/login?google=error&reason=blocked', [googleProvider])
 
     expect(wrapper.text()).toContain('Аккаунт заблокирован')
   })

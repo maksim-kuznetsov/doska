@@ -37,14 +37,12 @@ internal static class TestData
         return user;
     }
 
-    /// <summary>Создаёт подтверждённый аккаунт, привязанный к Google, без известного пароля.</summary>
-    public static User CreateGoogleUser(
+    /// <summary>Создаёт подтверждённый аккаунт без пароля, как при первом внешнем входе.</summary>
+    public static User CreatePasswordlessUser(
         string? email = null,
-        string? googleSubject = null,
         DateTimeOffset? now = null)
-        => User.CreateWithGoogle(
-            email ?? $"google-{Guid.NewGuid():N}@example.com",
-            googleSubject ?? $"google-subject-{Guid.NewGuid():N}",
+        => User.CreatePasswordless(
+            email ?? $"external-{Guid.NewGuid():N}@example.com",
             "test-hash",
             now ?? DateTimeOffset.UtcNow);
 

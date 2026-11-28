@@ -75,7 +75,7 @@ async function mountView(options: { authenticated?: boolean } = {}) {
       displayName: null,
       contacts: null,
       hasPassword: true,
-      isGoogleLinked: false,
+      linkedProviders: [],
     }
   }
 

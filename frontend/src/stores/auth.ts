@@ -1,13 +1,13 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
-import { api, type CurrentUser } from '../api/client'
+import { api, type AuthProviderInfo, type CurrentUser } from '../api/client'
 
 /** Состояние текущей сессии: пользователь загружается с сервера, не хранится в localStorage. */
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<CurrentUser | null>(null)
   const loaded = ref(false)
-  const googleEnabled = ref(false)
+  const providers = ref<AuthProviderInfo[]>([])
 
   const isAuthenticated = computed(() => user.value !== null)
   const canModerate = computed(
@@ -22,8 +22,8 @@ export const useAuthStore = defineStore('auth', () => {
     ])
 
     user.value = userResult.status === 'fulfilled' ? userResult.value : null
-    googleEnabled.value =
-      providersResult.status === 'fulfilled' ? providersResult.value.google : false
+    providers.value =
+      providersResult.status === 'fulfilled' ? providersResult.value.providers : []
     loaded.value = true
   }
 
@@ -49,7 +49,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     user,
     loaded,
-    googleEnabled,
+    providers,
     isAuthenticated,
     canModerate,
     isAdmin,
